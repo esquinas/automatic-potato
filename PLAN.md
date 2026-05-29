@@ -107,16 +107,20 @@ Adding a cinema = one new entry. The SensaCine ID is the code in the cinema’s 
 
 ## VO Filter Logic
 
-The JSON API already does most of the work via the `original`/`dubbed`/`local` keys. However the `local` bucket and edge cases (Spanish films, Basque/Galician films in their own language) need a secondary check on `diffusionVersion`:
+**Verified from live data:** use the bucket key as the sole filter — `diffusionVersion` is unreliable.
 
-**Exclude** any session where `diffusionVersion` matches:
-```ruby
-DUBBED_PATTERN = /\A(VF|VD)\z/i
-```
+Live output showed:
+- Dubbed films have `diffusionVersion=nil` (not `"VF"`/`"VD"` as assumed)
+- Original-version films have `diffusionVersion="ORIGINAL"` (not `"VO"`/`"VOSE"` as assumed)
 
-**Include** everything else: `VO`, `VOSE`, `VOS`, `V.O.S.E.`, `VOSI`, blank/nil (flagged with `·`), and any Spanish-language label.
+Therefore `diffusionVersion` cannot be used to distinguish versions. The bucket key is the correct filter:
 
-Spanish films are included naturally — they live in the `local` or `original` bucket and their `diffusionVersion` will not be `VF`/`VD`.
+**Include** sessions from the `original` and `local` buckets.  
+**Exclude** sessions from the `dubbed` bucket entirely — no secondary check needed.
+
+The display label shown in the Telegram message will be `diffusionVersion` if present and meaningful, otherwise the bucket name (`"original"` → shown as `VO`).
+
+Spanish films appear in `original` or `local` and are included naturally.
 
 ---
 
@@ -213,8 +217,9 @@ The `local` key’s meaning is not fully documented. Likely covers regional-lang
 | Old `api.sensacine.com/rest/v3` | ✅ Dead | 403 since ~2021; do not use |
 | Yelmo own API | ✅ None found | SensaCine is the right aggregator |
 | Ocine/cinesocine API | ✅ None found | Use SensaCine IDs when adding those cinemas |
-| Live endpoint reachability from GitHub Actions | ⏳ Pending | Test with first `workflow_dispatch` run |
-| TMDB search accuracy for Spanish titles | ⏳ Pending | Test with a known film list |
+| Live endpoint reachability from GitHub Actions | ✅ Confirmed | HTTP 200, 2 pages, 10 films returned |
+| TMDB search accuracy for Spanish titles | ✅ Confirmed | 5/5 correct matches, all Infinity× ratio (unambiguous) |
+| `diffusionVersion` values in live data | ✅ Corrected | Dubbed=`nil`, Original=`"ORIGINAL"` — use bucket key, not this field |
 
 ---
 
