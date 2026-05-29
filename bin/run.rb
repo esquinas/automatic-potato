@@ -11,6 +11,7 @@ TELEGRAM_BOT_TOKEN     = ENV.fetch("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID       = ENV.fetch("TELEGRAM_CHAT_ID")
 TELEGRAM_MAX_MSG_CHARS = 3800
 VO_BUCKETS             = %w[original local].freeze
+WEEK_DAYS              = 7
 
 CINEMAS = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"].freeze
 
@@ -21,10 +22,15 @@ SENSACINE_HEADERS = {
   "Referer"         => "https://www.sensacine.com/cines/cine/"
 }.freeze
 
-def http_get(url, headers = {})
+def http_get(url, headers = {}, retried: false)
+  sleep(1.5 + rand) # 1.5–2.5 s jitter between requests
   uri = URI(url)
   req = Net::HTTP::Get.new(uri, headers)
-  Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 10) { |h| h.request(req) }
+  resp = Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 10) { |h| h.request(req) }
+  return resp if resp.code == "200" || retried
+
+  puts "Retrying #{url}"
+  http_get(url, headers, retried: true)
 end
 
 def telegram_send(text)
@@ -35,44 +41,59 @@ def telegram_send(text)
   Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
 end
 
-date  = Date.today.to_s
+# Returns { title => { date_str => [times] } } for VO screenings across the week.
+def fetch_week(theater_id, start_date)
+  films = {}
+
+  WEEK_DAYS.times do |offset|
+    date = (start_date + offset).to_s
+    url  = "https://www.sensacine.com/_/showtimes/theater-#{theater_id}/d-#{date}/p-1/"
+
+    puts "GET #{url}"
+    resp = http_get(url, SENSACINE_HEADERS)
+    puts "HTTP #{resp.code}"
+
+    next unless resp.code == "200"
+
+    results = JSON.parse(resp.body)["results"] || []
+
+    results.each do |entry|
+      title = entry.dig("movie", "title") || "(sin título)"
+
+      times = VO_BUCKETS.flat_map do |bucket|
+        (entry.dig("showtimes", bucket) || []).map { |s| s["startsAt"]&.slice(11, 5) }
+      end.compact.sort.uniq
+
+      next if times.empty?
+
+      films[title] ||= {}
+      films[title][date] ||= []
+      films[title][date].concat(times)
+      films[title][date].sort!.uniq!
+    end
+  end
+
+  films
+end
+
+today = Date.today
 lines = []
 
 CINEMAS.each do |cinema|
-  theater_id = cinema["id"]
-  url = "https://www.sensacine.com/_/showtimes/theater-#{theater_id}/d-#{date}/p-1/"
+  week_end = (today + WEEK_DAYS - 1).to_s
+  lines << "<b>#{cinema["name"]} — #{today} → #{week_end}</b>"
 
-  puts "GET #{url}"
-  resp = http_get(url, SENSACINE_HEADERS)
-  puts "HTTP #{resp.code}"
+  films = fetch_week(cinema["id"], today)
 
-  if resp.code != "200"
-    telegram_send("ERROR: SensaCine returned HTTP #{resp.code} for #{cinema["name"]}")
-    exit 1
-  end
-
-  results = JSON.parse(resp.body)["results"] || []
-
-  lines << "<b>#{cinema["name"]} — #{date}</b>"
-
-  results.each do |entry|
-    title = entry.dig("movie", "title") || "(sin título)"
-
-    times_by_bucket = {}
-    VO_BUCKETS.each do |bucket|
-      sessions = entry.dig("showtimes", bucket) || []
-      next if sessions.empty?
-
-      times = sessions.map { |s| s["startsAt"]&.slice(11, 5) }.compact.sort
-      times_by_bucket[bucket] = times
-    end
-
-    next if times_by_bucket.empty?
-
-    lines << ""
-    lines << "<b>#{title}</b>"
-    times_by_bucket.each do |bucket, times|
-      lines << "  [#{bucket}] #{times.join(", ")}"
+  if films.empty?
+    lines << "  (sin sesiones VO esta semana)"
+  else
+    films.each do |title, dates|
+      lines << ""
+      lines << "<b>#{title}</b>"
+      dates.each do |date, times|
+        lines << "  #{date}: #{times.join(", ")}"
+      end
     end
   end
 
