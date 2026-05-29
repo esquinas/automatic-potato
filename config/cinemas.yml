@@ -1,3 +1,4 @@
 cinemas:
   - name: "Yelmo Ocimax Gijón"
     id: "E0628"
+    url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon"

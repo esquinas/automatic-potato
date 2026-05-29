@@ -114,8 +114,14 @@ today = Date.today
 lines = []
 
 CINEMAS.each do |cinema|
-  week_end = (today + WEEK_DAYS - 1).to_s
-  lines << "<b>#{cinema["name"]} — #{today} → #{week_end}</b>"
+  week_end     = (today + WEEK_DAYS - 1).to_s
+  cinema_label = "#{cinema["name"]} — #{today} → #{week_end}"
+  cinema_header = if cinema["url"]
+    "<b><a href=\"#{cinema["url"]}\">#{cinema_label}</a></b>"
+  else
+    "<b>#{cinema_label}</b>"
+  end
+  lines << cinema_header
 
   films = fetch_week(cinema["id"], today)
 
