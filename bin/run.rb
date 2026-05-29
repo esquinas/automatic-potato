@@ -8,7 +8,8 @@ require "date"
 
 TELEGRAM_BOT_TOKEN = ENV.fetch("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID   = ENV.fetch("TELEGRAM_CHAT_ID")
-THEATER_ID         = "E0628"
+THEATER_ID              = "E0628"
+TELEGRAM_MAX_MSG_CHARS  = 3800
 
 SENSACINE_HEADERS = {
   "User-Agent"      => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -69,7 +70,7 @@ results.each do |entry|
 end
 
 message = lines.join("\n")
-message = message[0, 3800] + "\n... (truncated)" if message.length > 3800
+message = message[0, TELEGRAM_MAX_MSG_CHARS] + "\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
 
 telegram_send(message)
 puts "Sent #{message.length} chars to Telegram"
