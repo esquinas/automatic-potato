@@ -9,9 +9,11 @@ require "yaml"
 
 TELEGRAM_BOT_TOKEN     = ENV.fetch("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID       = ENV.fetch("TELEGRAM_CHAT_ID")
+TMDB_API_KEY           = ENV.fetch("TMDB_API_KEY")
 TELEGRAM_MAX_MSG_CHARS = 3800
 VO_BUCKETS             = %w[original local].freeze
 WEEK_DAYS              = 7
+TMDB_AMBIGUITY_RATIO   = 2.0
 
 CINEMAS = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"].freeze
 
@@ -41,6 +43,27 @@ def telegram_send(text)
   Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
 end
 
+# Returns "★ X.X" for the best TMDB match, or nil if ambiguous / not found.
+def tmdb_rating(title, year = nil)
+  query = URI.encode_www_form(query: title, language: "es-ES", api_key: TMDB_API_KEY)
+  query += "&year=#{year}" if year
+  url  = "https://api.themoviedb.org/3/search/movie?#{query}"
+  resp = http_get(url)
+  return nil unless resp.code == "200"
+
+  results = JSON.parse(resp.body)["results"] || []
+  return nil if results.empty?
+
+  top    = results[0]["vote_average"].to_f
+  second = results[1]&.dig("vote_average").to_f
+
+  # Skip if the top result isn't clearly dominant (vote count 0 = no data)
+  return nil if results[0]["vote_count"].to_i.zero?
+  return nil if second > 0 && top / second < TMDB_AMBIGUITY_RATIO
+
+  format("★ %.1f", top)
+end
+
 # Returns { title => { date_str => [times] } } for VO screenings across the week.
 def fetch_week(theater_id, start_date)
   films = {}
@@ -59,6 +82,7 @@ def fetch_week(theater_id, start_date)
 
     results.each do |entry|
       title = entry.dig("movie", "title") || "(sin título)"
+      year  = entry.dig("movie", "release", "year")
 
       times = VO_BUCKETS.flat_map do |bucket|
         (entry.dig("showtimes", bucket) || []).map { |s| s["startsAt"]&.slice(11, 5) }
@@ -66,10 +90,10 @@ def fetch_week(theater_id, start_date)
 
       next if times.empty?
 
-      films[title] ||= {}
-      films[title][date] ||= []
-      films[title][date].concat(times)
-      films[title][date].sort!.uniq!
+      films[title] ||= { year: year, dates: {} }
+      films[title][:dates][date] ||= []
+      films[title][:dates][date].concat(times)
+      films[title][:dates][date].sort!.uniq!
     end
   end
 
@@ -88,10 +112,12 @@ CINEMAS.each do |cinema|
   if films.empty?
     lines << "  (sin sesiones VO esta semana)"
   else
-    films.each do |title, dates|
+    films.each do |title, info|
+      rating = tmdb_rating(title, info[:year])
+      header = rating ? "<b>#{title}</b> #{rating}" : "<b>#{title}</b>"
       lines << ""
-      lines << "<b>#{title}</b>"
-      dates.each do |date, times|
+      lines << header
+      info[:dates].each do |date, times|
         lines << "  #{date}: #{times.join(", ")}"
       end
     end
