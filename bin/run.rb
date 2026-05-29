@@ -22,10 +22,15 @@ SENSACINE_HEADERS = {
   "Referer"         => "https://www.sensacine.com/cines/cine/"
 }.freeze
 
-def http_get(url, headers = {})
+def http_get(url, headers = {}, retried: false)
+  sleep(1.5 + rand) # 1.5–2.5 s jitter between requests
   uri = URI(url)
   req = Net::HTTP::Get.new(uri, headers)
-  Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 10) { |h| h.request(req) }
+  resp = Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 10) { |h| h.request(req) }
+  return resp if resp.code == "200" || retried
+
+  puts "Retrying #{url}"
+  http_get(url, headers, retried: true)
 end
 
 def telegram_send(text)
