@@ -1,3 +1,32 @@
 cinemas:
-  - name: "Yelmo Ocimax Gijón"
+  - name: "Yelmo Cines Ocimax Gijón"
     id: "E0628"
+    url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon"
+
+  - name: "Ocine Premium Los Fresnos"
+    id: "E2907"
+    url: "https://www.ocinepremiumlosfresnos.es/"
+
+  - name: "Centro Municipal Integrado Ateneo de La Calzada"
+    id: "G02D6"
+    url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-ateneo-de-la-calzada"
+
+  - name: "Centro Municipal Integrado La Arena"
+    id: "G02GE"
+    url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-larena"
+
+  - name: "Teatro de la Laboral (Laboral Cinemateca)"
+    id: "G02A3"
+    url: "https://www.laboralcinemateca.es/en/venta-de-entradas"
+
+  - name: "Teatro Jovellanos"
+    id: "G02E8"
+    url: "https://teatrojovellanos.janto.es/"
+
+  - name: "Centro de Cultura Antiguo Instituto"
+    id: "G02E9"
+    url: "https://www.gijon.es/es/directorio/centro-de-cultura-antiguo-instituto"
+
+  - name: "Centro Municipal Integrado El Llano"
+    id: "G02GD"
+    url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-el-llano"
