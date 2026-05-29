@@ -12,7 +12,7 @@ TELEGRAM_CHAT_ID       = ENV.fetch("TELEGRAM_CHAT_ID")
 TMDB_API_KEY           = ENV.fetch("TMDB_API_KEY")
 TELEGRAM_MAX_MSG_CHARS = 3800
 VO_BUCKETS             = %w[original local].freeze
-ALL_BUCKETS            = %w[original local dubbed].freeze
+UNFILTERED_BUCKETS     = %w[original local dubbed].freeze
 WEEK_DAYS              = 7
 TMDB_AMBIGUITY_RATIO   = 2.0
 
@@ -53,21 +53,24 @@ def tmdb_info(title, year = nil)
   return nil unless resp.code == "200"
 
   results = JSON.parse(resp.body)["results"] || []
-  return nil if results.empty?
-
   top    = results[0]
   second = results[1]
 
-  return nil if top["vote_count"].to_i.zero?
+  return nil if results.empty? || top["vote_count"].to_i.zero?
 
   top_score    = top["vote_average"].to_f
-  second_score = second&.dig("vote_average").to_f
+  second_score = (second&.dig("vote_average") || 0).to_f
   return nil if second_score > 0 && top_score / second_score < TMDB_AMBIGUITY_RATIO
 
   {
     rating:         format("★ %.1f", top_score),
     original_title: top["original_title"]
   }
+end
+
+def cinema_header(cinema, label)
+  return "<b>#{label}</b>" unless cinema["url"]
+  "<b><a href=\"#{cinema["url"]}\">#{label}</a></b>"
 end
 
 def format_date(date_str)
@@ -79,7 +82,7 @@ end
 # check_vo: true restricts to VO buckets; false collects all (assumes venue is VOSE).
 def fetch_week(theater_id, start_date, check_vo: false)
   films = {}
-  buckets = check_vo ? VO_BUCKETS : ALL_BUCKETS
+  buckets = check_vo ? VO_BUCKETS : UNFILTERED_BUCKETS
 
   WEEK_DAYS.times do |offset|
     date = (start_date + offset).to_s
@@ -104,9 +107,7 @@ def fetch_week(theater_id, start_date, check_vo: false)
       next if times.empty?
 
       films[title] ||= { year: year, dates: {} }
-      films[title][:dates][date] ||= []
-      films[title][:dates][date].concat(times)
-      films[title][:dates][date].sort!.uniq!
+      (films[title][:dates][date] ||= []).concat(times).sort!.uniq!
     end
   end
 
@@ -118,8 +119,6 @@ lines = []
 no_vo_cinemas = []
 
 CINEMAS.each do |cinema|
-  next unless cinema["id"]
-
   films = fetch_week(cinema["id"], today, check_vo: cinema["check_vo"])
 
   if films.empty?
@@ -127,14 +126,8 @@ CINEMAS.each do |cinema|
     next
   end
 
-  week_end     = (today + WEEK_DAYS - 1).to_s
-  cinema_label = "#{cinema["name"]} — #{today} → #{week_end}"
-  cinema_header = if cinema["url"]
-    "<b><a href=\"#{cinema["url"]}\">#{cinema_label}</a></b>"
-  else
-    "<b>#{cinema_label}</b>"
-  end
-  lines << cinema_header
+  week_end = (today + WEEK_DAYS - 1).to_s
+  lines << cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}")
 
   films.each do |title, info|
     tmdb   = tmdb_info(title, info[:year])
