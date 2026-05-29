@@ -59,10 +59,10 @@ GET https://www.sensacine.com/_/showtimes/theater-{ID}/d-{DATE}/p-{PAGE}/
       "movie": { "title": "Anora" },
       "showtimes": {
         "original": [
-          { "internalId": "...", "startsAt": "2026-06-02T20:45:00", "diffusionVersion": "VO" }
+          { "internalId": "...", "startsAt": "2026-06-02T20:45:00", "diffusionVersion": "ORIGINAL" }
         ],
         "dubbed": [
-          { "internalId": "...", "startsAt": "2026-06-02T18:00:00", "diffusionVersion": "VF" }
+          { "internalId": "...", "startsAt": "2026-06-02T18:00:00", "diffusionVersion": null }
         ],
         "local": []
       }
