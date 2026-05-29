@@ -8,7 +8,8 @@ require "date"
 
 TELEGRAM_BOT_TOKEN = ENV.fetch("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID   = ENV.fetch("TELEGRAM_CHAT_ID")
-THEATER_ID         = "E0628"
+THEATER_ID              = "E0628"
+TELEGRAM_MAX_MSG_CHARS  = 3800
 
 SENSACINE_HEADERS = {
   "User-Agent"      => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -43,10 +44,33 @@ if resp.code != "200"
   exit 1
 end
 
-# Truncate to fit Telegram's 4096-char limit (leave room for header)
-raw   = JSON.pretty_generate(JSON.parse(resp.body))
-limit = 3800
-body  = raw.length > limit ? raw[0, limit] + "\n... (truncated)" : raw
+results = JSON.parse(resp.body)["results"] || []
 
-telegram_send("<b>SensaCine raw dump (#{date})</b>\n<pre>#{body}</pre>")
-puts "Sent #{body.length} chars to Telegram"
+lines = ["<b>Cartelera Yelmo Ocimax — #{date}</b>"]
+
+results.each do |entry|
+  title = entry.dig("movie", "title") || "(sin título)"
+
+  times_by_bucket = {}
+  %w[original dubbed local].each do |bucket|
+    sessions = entry.dig("showtimes", bucket) || []
+    next if sessions.empty?
+
+    times = sessions.map { |s| s["startsAt"]&.slice(11, 5) }.compact.sort
+    times_by_bucket[bucket] = times
+  end
+
+  next if times_by_bucket.empty?
+
+  lines << ""
+  lines << "<b>#{title}</b>"
+  times_by_bucket.each do |bucket, times|
+    lines << "  [#{bucket}] #{times.join(", ")}"
+  end
+end
+
+message = lines.join("\n")
+message = message[0, TELEGRAM_MAX_MSG_CHARS] + "\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
+
+telegram_send(message)
+puts "Sent #{message.length} chars to Telegram"
