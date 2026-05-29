@@ -112,9 +112,17 @@ end
 
 today = Date.today
 lines = []
+no_vo_cinemas = []
 
 CINEMAS.each do |cinema|
   next unless cinema["id"]
+
+  films = fetch_week(cinema["id"], today)
+
+  if films.empty?
+    no_vo_cinemas << cinema["name"]
+    next
+  end
 
   week_end     = (today + WEEK_DAYS - 1).to_s
   cinema_label = "#{cinema["name"]} — #{today} → #{week_end}"
@@ -125,28 +133,34 @@ CINEMAS.each do |cinema|
   end
   lines << cinema_header
 
-  films = fetch_week(cinema["id"], today)
+  films.each do |title, info|
+    tmdb   = tmdb_info(title, info[:year])
+    rating = tmdb&.dig(:rating)
+    orig   = tmdb&.dig(:original_title)
 
-  if films.empty?
-    lines << "  (no VO sessions this week)"
-  else
-    films.each do |title, info|
-      tmdb   = tmdb_info(title, info[:year])
-      rating = tmdb&.dig(:rating)
-      orig   = tmdb&.dig(:original_title)
+    title_line = "<b>#{title}</b>"
+    title_line += " <i>(#{orig})</i>" if orig && orig.downcase != title.downcase
+    title_line += " #{rating}"        if rating
 
-      title_line = "<b>#{title}</b>"
-      title_line += " <i>(#{orig})</i>" if orig && orig.downcase != title.downcase
-      title_line += " #{rating}"        if rating
+    lines << ""
+    lines << title_line
 
-      lines << ""
-      lines << title_line
-      info[:dates].each do |date, times|
+    dates = info[:dates]
+    if dates.keys.length == WEEK_DAYS
+      all_times = dates.values.flatten.sort.uniq
+      lines << "  All week: #{dates.keys.min} → #{dates.keys.max}: #{all_times.join(", ")}"
+    else
+      dates.each do |date, times|
         lines << "  #{format_date(date)}: #{times.join(", ")}"
       end
     end
   end
 
+  lines << ""
+end
+
+unless no_vo_cinemas.empty?
+  lines << "The following venues had no VO sessions: #{no_vo_cinemas.join(", ")}"
   lines << ""
 end
 
