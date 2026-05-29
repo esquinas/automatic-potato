@@ -2,10 +2,12 @@ cinemas:
   - name: "Yelmo Cines Ocimax Gijón"
     id: "E0628"
     url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon"
+    check_vo: true
 
   - name: "Ocine Premium Los Fresnos"
     id: "E2907"
     url: "https://www.ocinepremiumlosfresnos.es/"
+    check_vo: true
 
   - name: "Centro Municipal Integrado Ateneo de La Calzada"
     id: "G02D6"

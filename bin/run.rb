@@ -12,6 +12,7 @@ TELEGRAM_CHAT_ID       = ENV.fetch("TELEGRAM_CHAT_ID")
 TMDB_API_KEY           = ENV.fetch("TMDB_API_KEY")
 TELEGRAM_MAX_MSG_CHARS = 3800
 VO_BUCKETS             = %w[original local].freeze
+ALL_BUCKETS            = %w[original local dubbed].freeze
 WEEK_DAYS              = 7
 TMDB_AMBIGUITY_RATIO   = 2.0
 
@@ -74,9 +75,11 @@ def format_date(date_str)
   "#{date.strftime("%a")} #{date_str}"
 end
 
-# Returns { title => { year:, dates: { date_str => [times] } } } for VO screenings.
-def fetch_week(theater_id, start_date)
+# Returns { title => { year:, dates: { date_str => [times] } } } for screenings.
+# check_vo: true restricts to VO buckets; false collects all (assumes venue is VOSE).
+def fetch_week(theater_id, start_date, check_vo: false)
   films = {}
+  buckets = check_vo ? VO_BUCKETS : ALL_BUCKETS
 
   WEEK_DAYS.times do |offset|
     date = (start_date + offset).to_s
@@ -94,7 +97,7 @@ def fetch_week(theater_id, start_date)
       title = entry.dig("movie", "title") || "(untitled)"
       year  = entry.dig("movie", "release", "year")
 
-      times = VO_BUCKETS.flat_map do |bucket|
+      times = buckets.flat_map do |bucket|
         (entry.dig("showtimes", bucket) || []).map { |s| s["startsAt"]&.slice(11, 5) }
       end.compact.sort.uniq
 
@@ -112,17 +115,9 @@ end
 
 today = Date.today
 lines = []
-no_vo_cinemas = []
 
 CINEMAS.each do |cinema|
   next unless cinema["id"]
-
-  films = fetch_week(cinema["id"], today)
-
-  if films.empty?
-    no_vo_cinemas << cinema["name"]
-    next
-  end
 
   week_end     = (today + WEEK_DAYS - 1).to_s
   cinema_label = "#{cinema["name"]} — #{today} → #{week_end}"
@@ -133,34 +128,28 @@ CINEMAS.each do |cinema|
   end
   lines << cinema_header
 
-  films.each do |title, info|
-    tmdb   = tmdb_info(title, info[:year])
-    rating = tmdb&.dig(:rating)
-    orig   = tmdb&.dig(:original_title)
+  films = fetch_week(cinema["id"], today, check_vo: cinema["check_vo"])
 
-    title_line = "<b>#{title}</b>"
-    title_line += " <i>(#{orig})</i>" if orig && orig.downcase != title.downcase
-    title_line += " #{rating}"        if rating
+  if films.empty?
+    lines << "  (no VO sessions this week)"
+  else
+    films.each do |title, info|
+      tmdb   = tmdb_info(title, info[:year])
+      rating = tmdb&.dig(:rating)
+      orig   = tmdb&.dig(:original_title)
 
-    lines << ""
-    lines << title_line
+      title_line = "<b>#{title}</b>"
+      title_line += " <i>(#{orig})</i>" if orig && orig.downcase != title.downcase
+      title_line += " #{rating}"        if rating
 
-    dates = info[:dates]
-    if dates.keys.length == WEEK_DAYS
-      all_times = dates.values.flatten.sort.uniq
-      lines << "  All week: #{dates.keys.min} → #{dates.keys.max}: #{all_times.join(", ")}"
-    else
-      dates.each do |date, times|
+      lines << ""
+      lines << title_line
+      info[:dates].each do |date, times|
         lines << "  #{format_date(date)}: #{times.join(", ")}"
       end
     end
   end
 
-  lines << ""
-end
-
-unless no_vo_cinemas.empty?
-  lines << "The following venues had no VO sessions: #{no_vo_cinemas.join(", ")}"
   lines << ""
 end
 
