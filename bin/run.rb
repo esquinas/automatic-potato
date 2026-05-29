@@ -43,8 +43,8 @@ def telegram_send(text)
   Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
 end
 
-# Returns "★ X.X" for the best TMDB match, or nil if ambiguous / not found.
-def tmdb_rating(title, year = nil)
+# Returns { rating: "★ X.X", original_title: "..." } or nil if ambiguous / not found.
+def tmdb_info(title, year = nil)
   query = URI.encode_www_form(query: title, language: "es-ES", api_key: TMDB_API_KEY)
   query += "&year=#{year}" if year
   url  = "https://api.themoviedb.org/3/search/movie?#{query}"
@@ -54,17 +54,27 @@ def tmdb_rating(title, year = nil)
   results = JSON.parse(resp.body)["results"] || []
   return nil if results.empty?
 
-  top    = results[0]["vote_average"].to_f
-  second = results[1]&.dig("vote_average").to_f
+  top    = results[0]
+  second = results[1]
 
-  # Skip if the top result isn't clearly dominant (vote count 0 = no data)
-  return nil if results[0]["vote_count"].to_i.zero?
-  return nil if second > 0 && top / second < TMDB_AMBIGUITY_RATIO
+  return nil if top["vote_count"].to_i.zero?
 
-  format("★ %.1f", top)
+  top_score    = top["vote_average"].to_f
+  second_score = second&.dig("vote_average").to_f
+  return nil if second_score > 0 && top_score / second_score < TMDB_AMBIGUITY_RATIO
+
+  {
+    rating:         format("★ %.1f", top_score),
+    original_title: top["original_title"]
+  }
 end
 
-# Returns { title => { date_str => [times] } } for VO screenings across the week.
+def format_date(date_str)
+  date = Date.parse(date_str)
+  "#{date.strftime("%a")} #{date_str}"
+end
+
+# Returns { title => { year:, dates: { date_str => [times] } } } for VO screenings.
 def fetch_week(theater_id, start_date)
   films = {}
 
@@ -81,7 +91,7 @@ def fetch_week(theater_id, start_date)
     results = JSON.parse(resp.body)["results"] || []
 
     results.each do |entry|
-      title = entry.dig("movie", "title") || "(sin título)"
+      title = entry.dig("movie", "title") || "(untitled)"
       year  = entry.dig("movie", "release", "year")
 
       times = VO_BUCKETS.flat_map do |bucket|
@@ -110,15 +120,21 @@ CINEMAS.each do |cinema|
   films = fetch_week(cinema["id"], today)
 
   if films.empty?
-    lines << "  (sin sesiones VO esta semana)"
+    lines << "  (no VO sessions this week)"
   else
     films.each do |title, info|
-      rating = tmdb_rating(title, info[:year])
-      header = rating ? "<b>#{title}</b> #{rating}" : "<b>#{title}</b>"
+      tmdb   = tmdb_info(title, info[:year])
+      rating = tmdb&.dig(:rating)
+      orig   = tmdb&.dig(:original_title)
+
+      title_line = "<b>#{title}</b>"
+      title_line += " <i>(#{orig})</i>" if orig && orig.downcase != title.downcase
+      title_line += " #{rating}"        if rating
+
       lines << ""
-      lines << header
+      lines << title_line
       info[:dates].each do |date, times|
-        lines << "  #{date}: #{times.join(", ")}"
+        lines << "  #{format_date(date)}: #{times.join(", ")}"
       end
     end
   end
