@@ -91,7 +91,7 @@ def fetch_week(theater_id, start_date)
     results = JSON.parse(resp.body)["results"] || []
 
     results.each do |entry|
-      title = entry.dig("movie", "title") || "(sin título)"
+      title = entry.dig("movie", "title") || "(untitled)"
       year  = entry.dig("movie", "release", "year")
 
       times = VO_BUCKETS.flat_map do |bucket|
@@ -120,7 +120,7 @@ CINEMAS.each do |cinema|
   films = fetch_week(cinema["id"], today)
 
   if films.empty?
-    lines << "  (sin sesiones VO esta semana)"
+    lines << "  (no VO sessions this week)"
   else
     films.each do |title, info|
       tmdb   = tmdb_info(title, info[:year])
