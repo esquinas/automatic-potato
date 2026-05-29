@@ -12,21 +12,21 @@ cinemas:
     url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-ateneo-de-la-calzada"
 
   - name: "Centro Municipal Integrado La Arena"
-    id: ~   # SensaCine ID unknown — fill in to enable fetching
+    id: "G02GE"
     url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-larena"
 
   - name: "Teatro de la Laboral (Laboral Cinemateca)"
-    id: ~   # SensaCine ID unknown — fill in to enable fetching
+    id: "G02A3"
     url: "https://www.laboralcinemateca.es/en/venta-de-entradas"
 
   - name: "Teatro Jovellanos"
-    id: ~   # SensaCine ID unknown — fill in to enable fetching
+    id: "G02E8"
     url: "https://teatrojovellanos.janto.es/"
 
   - name: "Centro de Cultura Antiguo Instituto"
-    id: ~   # SensaCine ID unknown — fill in to enable fetching
+    id: "G02E9"
     url: "https://www.gijon.es/es/directorio/centro-de-cultura-antiguo-instituto"
 
   - name: "Centro Municipal Integrado El Llano"
-    id: ~   # SensaCine ID unknown — fill in to enable fetching
+    id: "G02GD"
     url: "https://www.gijon.es/es/directorio/centro-municipal-integrado-el-llano"
