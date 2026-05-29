@@ -114,6 +114,8 @@ today = Date.today
 lines = []
 
 CINEMAS.each do |cinema|
+  next unless cinema["id"]
+
   week_end     = (today + WEEK_DAYS - 1).to_s
   cinema_label = "#{cinema["name"]} — #{today} → #{week_end}"
   cinema_header = if cinema["url"]
