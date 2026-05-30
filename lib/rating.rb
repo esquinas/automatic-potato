@@ -2,5 +2,6 @@
 
 Rating = Data.define(:score) do
   def self.null = new(score: nil).freeze
-  def formatted = score && format("★ %.1f", score)
+  def to_s   = score ? format("★ %.1f", score) : ""
+  def to_str = to_s
 end
