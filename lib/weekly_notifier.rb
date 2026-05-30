@@ -65,9 +65,10 @@ class WeeklyNotifier
   end
 
   def render_film(film, rating, sessions)
-    title_line = "<b>#{film.localized_title}</b>"
-    title_line += " <i>(#{film.title})</i>" if film.title && film.title.downcase != film.localized_title.downcase
-    title_line += " #{rating.formatted}"
+    parts = ["<b>#{film.localized_title}</b>"]
+    parts << "<i>(#{film.title})</i>" if film.title && film.title.downcase != film.localized_title.downcase
+    parts << rating.formatted
+    title_line = parts.reject(&:empty?).join(" ")
 
     dates_map = sessions
       .group_by(&:date)
