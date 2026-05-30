@@ -11,7 +11,11 @@ end
 require "minitest/autorun"
 require "minitest/mock"
 require "json"
-require_relative "bin/run"
+require_relative "lib/film"
+require_relative "lib/screening_session"
+require_relative "lib/rating"
+require_relative "lib/sensacine_adapter"
+require_relative "lib/tmdb_adapter"
 
 # ---------------------------------------------------------------------------
 # Film
