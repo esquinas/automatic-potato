@@ -61,8 +61,8 @@ class RatingTest < Minitest::Test
     assert_equal "★ 7.2", Rating.new(score: 7.2).formatted
   end
 
-  def test_null_formatted_is_empty_string
-    assert_equal "", Rating.null.formatted
+  def test_null_formatted_is_nil
+    assert_nil Rating.null.formatted
   end
 
   def test_null_is_singleton
@@ -229,7 +229,7 @@ class TmdbAdapterTest < Minitest::Test
     ])
 
     @adapter.stub(:http_get, resp) do
-      assert_equal "", @adapter.rating_for(@film).formatted
+      assert_nil @adapter.rating_for(@film).formatted
     end
   end
 
@@ -237,14 +237,14 @@ class TmdbAdapterTest < Minitest::Test
     resp = fake_response([result(original_title: "The Substance", vote_average: 7.2, vote_count: 0)])
 
     @adapter.stub(:http_get, resp) do
-      assert_equal "", @adapter.rating_for(@film).formatted
+      assert_nil @adapter.rating_for(@film).formatted
     end
   end
 
   def test_rating_for_empty_results_returns_null
     resp = fake_response([])
     @adapter.stub(:http_get, resp) do
-      assert_equal "", @adapter.rating_for(@film).formatted
+      assert_nil @adapter.rating_for(@film).formatted
     end
   end
 end
