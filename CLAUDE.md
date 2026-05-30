@@ -2,6 +2,19 @@
 
 A Ruby script that queries SensaCine's internal JSON API weekly for non-dubbed screenings in Gijón, enriches results with TMDB ratings, and delivers a Telegram digest every Monday morning.
 
+## Git workflow
+
+Every change gets its own branch cut from the latest `master`. Never add commits to an existing feature branch when asked to make a new, separate change.
+
+```bash
+git fetch origin master
+git checkout origin/master -b <branch-name>
+# make changes, commit, push
+git push -u origin <branch-name>
+```
+
+Each branch maps to exactly one PR. When master moves forward (merged PRs), always rebase or re-cut before opening a new PR so it has a single, clean commit on top of current master.
+
 ## Commands
 
 ```bash
