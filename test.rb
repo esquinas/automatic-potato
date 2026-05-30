@@ -57,20 +57,12 @@ end
 # ---------------------------------------------------------------------------
 
 class RatingTest < Minitest::Test
-  def test_present
-    assert Rating.new(score: 7.2).present?
-  end
-
   def test_formatted
     assert_equal "★ 7.2", Rating.new(score: 7.2).formatted
   end
 
-  def test_null_not_present
-    refute Rating.null.present?
-  end
-
-  def test_null_formatted_is_nil
-    assert_nil Rating.null.formatted
+  def test_null_formatted_is_empty_string
+    assert_equal "", Rating.null.formatted
   end
 
   def test_null_is_singleton
@@ -225,21 +217,19 @@ class TmdbAdapterTest < Minitest::Test
     ])
 
     @adapter.stub(:http_get, resp) do
-      rating = @adapter.rating_for(@film)
-      assert rating.present?
-      assert_equal "★ 7.2", rating.formatted
+      assert_equal "★ 7.2", @adapter.rating_for(@film).formatted
     end
   end
 
   def test_rating_for_ambiguous_returns_null
-    # 7.2 / 4.0 = 1.8 < TMDB_AMBIGUITY_RATIO (2.0)
+    # 7.2 / 4.0 = 1.8 < AMBIGUITY_RATIO (2.0)
     resp = fake_response([
       result(original_title: "The Substance", vote_average: 7.2, vote_count: 1500),
       result(original_title: "Ambiguous",     vote_average: 4.0, vote_count: 800)
     ])
 
     @adapter.stub(:http_get, resp) do
-      refute @adapter.rating_for(@film).present?
+      assert_equal "", @adapter.rating_for(@film).formatted
     end
   end
 
@@ -247,14 +237,14 @@ class TmdbAdapterTest < Minitest::Test
     resp = fake_response([result(original_title: "The Substance", vote_average: 7.2, vote_count: 0)])
 
     @adapter.stub(:http_get, resp) do
-      refute @adapter.rating_for(@film).present?
+      assert_equal "", @adapter.rating_for(@film).formatted
     end
   end
 
   def test_rating_for_empty_results_returns_null
     resp = fake_response([])
     @adapter.stub(:http_get, resp) do
-      refute @adapter.rating_for(@film).present?
+      assert_equal "", @adapter.rating_for(@film).formatted
     end
   end
 end
