@@ -10,7 +10,7 @@ class TmdbClient
 
   AMBIGUITY_RATIO = 2.0
 
-  def initialize(api_key:)
+  def initialize(api_key: ENV.fetch("TMDB_API_KEY"))
     @api_key = api_key
   end
 

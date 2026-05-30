@@ -11,10 +11,7 @@ CINEMAS = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cin
 
 WeeklyNotifier.new(
   showtimes: SensacineClient.new,
-  movies_db: TmdbClient.new(api_key: ENV.fetch("TMDB_API_KEY")),
-  messenger: TelegramMessenger.new(
-    token:   ENV.fetch("TELEGRAM_BOT_TOKEN"),
-    chat_id: ENV.fetch("TELEGRAM_CHAT_ID")
-  ),
-  cinemas: CINEMAS
+  movies_db: TmdbClient.new,
+  messenger: TelegramMessenger.new,
+  cinemas:   CINEMAS
 ).run

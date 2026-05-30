@@ -5,7 +5,7 @@ require "json"
 require "uri"
 
 class TelegramMessenger
-  def initialize(token:, chat_id:)
+  def initialize(token: ENV.fetch("TELEGRAM_BOT_TOKEN"), chat_id: ENV.fetch("TELEGRAM_CHAT_ID"))
     @token   = token
     @chat_id = chat_id
   end
