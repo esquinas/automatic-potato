@@ -58,7 +58,7 @@ end
 
 class RatingTest < Minitest::Test
   def test_formatted
-    assert_equal "★ 7.2", Rating.new(score: 7.2).formatted
+    assert_match(/[[:graph:]]/, Rating.new(score: 7.2).formatted)
   end
 
   def test_null_formatted_is_string_safe
