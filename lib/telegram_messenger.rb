@@ -4,7 +4,7 @@ require "net/http"
 require "json"
 require "uri"
 
-class TelegramAdapter
+class TelegramMessenger
   def initialize(token:, chat_id:)
     @token   = token
     @chat_id = chat_id

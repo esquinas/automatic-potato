@@ -6,10 +6,10 @@ class WeeklyNotifier
   TELEGRAM_MAX_MSG_CHARS = 3800
   WEEK_DAYS              = 7
 
-  def initialize(sensacine:, tmdb:, telegram:, cinemas:)
-    @sensacine = sensacine
-    @tmdb      = tmdb
-    @telegram  = telegram
+  def initialize(showtimes:, movies_db:, messenger:, cinemas:)
+    @showtimes = showtimes
+    @movies_db = movies_db
+    @messenger = messenger
     @cinemas   = cinemas
   end
 
@@ -37,8 +37,8 @@ class WeeklyNotifier
     message = lines.join("\n").strip
     message = "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
 
-    @telegram.send_message(message)
-    puts "Sent #{message.length} chars to Telegram"
+    @messenger.send_message(message)
+    puts "Sent #{message.length} chars"
   end
 
   private
@@ -46,7 +46,7 @@ class WeeklyNotifier
   def collect_sessions(cinema, today)
     WEEK_DAYS.times.flat_map do |offset|
       date     = (today + offset).to_s
-      sessions = @sensacine.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
+      sessions = @showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
       cinema["check_vo"] ? sessions.select(&:original_version?) : sessions
     end
   end
@@ -55,10 +55,10 @@ class WeeklyNotifier
     week_end     = (today + WEEK_DAYS - 1).to_s
     unique_films = sessions.map(&:film).uniq
 
-    unique_films.each { |film| film.title = @tmdb.fetch_original_title(film) }
+    unique_films.each { |film| film.title = @movies_db.fetch_original_title(film) }
 
     film_lines = unique_films.flat_map do |film|
-      render_film(film, @tmdb.rating_for(film), sessions.select { |s| s.film == film })
+      render_film(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
     end
 
     [cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}"), *film_lines]

@@ -5,7 +5,7 @@ require_relative "http_client"
 require_relative "film"
 require_relative "screening_session"
 
-class SensacineAdapter
+class SensacineClient
   include HttpClient
 
   VO_BUCKETS         = %w[original local].freeze

@@ -14,8 +14,8 @@ require "json"
 require_relative "lib/film"
 require_relative "lib/screening_session"
 require_relative "lib/rating"
-require_relative "lib/sensacine_adapter"
-require_relative "lib/tmdb_adapter"
+require_relative "lib/sensacine_client"
+require_relative "lib/tmdb_client"
 
 # ---------------------------------------------------------------------------
 # Film
@@ -88,14 +88,14 @@ class ScreeningSessionTest < Minitest::Test
 end
 
 # ---------------------------------------------------------------------------
-# SensacineAdapter
+# SensacineClient
 # ---------------------------------------------------------------------------
 
-class SensacineAdapterTest < Minitest::Test
+class SensacineClientTest < Minitest::Test
   FakeResponse = Struct.new(:code, :body)
 
   def setup
-    @adapter = SensacineAdapter.new
+    @client = SensacineClient.new
   end
 
   def fake_response(results)
@@ -112,8 +112,8 @@ class SensacineAdapterTest < Minitest::Test
       showtimes: { "original" => [{ "startsAt" => "2024-11-15T19:30:00" }] }
     )])
 
-    @adapter.stub(:http_get, resp) do
-      sessions = @adapter.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
       assert_equal 1, sessions.length
       assert sessions.first.original_version?
       assert_equal "La sustancia", sessions.first.film.localized_title
@@ -127,8 +127,8 @@ class SensacineAdapterTest < Minitest::Test
       showtimes: { "dubbed" => [{ "startsAt" => "2024-11-15T17:00:00" }] }
     )])
 
-    @adapter.stub(:http_get, resp) do
-      sessions = @adapter.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
       assert_equal 1, sessions.length
       refute sessions.first.original_version?
     end
@@ -143,8 +143,8 @@ class SensacineAdapterTest < Minitest::Test
       }
     )])
 
-    @adapter.stub(:http_get, resp) do
-      sessions = @adapter.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
       assert_equal 2, sessions.length
       assert     sessions.find { |s| s.starts_at == "19:30" }.original_version?
       refute     sessions.find { |s| s.starts_at == "17:00" }.original_version?
@@ -153,8 +153,8 @@ class SensacineAdapterTest < Minitest::Test
 
   def test_returns_empty_on_non_200
     resp = FakeResponse.new("503", "")
-    @adapter.stub(:http_get, resp) do
-      sessions = @adapter.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
       assert_empty sessions
     end
   end
@@ -165,23 +165,23 @@ class SensacineAdapterTest < Minitest::Test
       showtimes: { "original" => [{ "startsAt" => nil }] }
     )])
 
-    @adapter.stub(:http_get, resp) do
-      sessions = @adapter.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
       assert_empty sessions
     end
   end
 end
 
 # ---------------------------------------------------------------------------
-# TmdbAdapter
+# TmdbClient
 # ---------------------------------------------------------------------------
 
-class TmdbAdapterTest < Minitest::Test
+class TmdbClientTest < Minitest::Test
   FakeResponse = Struct.new(:code, :body)
 
   def setup
-    @adapter = TmdbAdapter.new(api_key: "test_key")
-    @film    = Film.new(localized_title: "La sustancia", year: 2024)
+    @client = TmdbClient.new(api_key: "test_key")
+    @film   = Film.new(localized_title: "La sustancia", year: 2024)
   end
 
   def fake_response(results)
@@ -195,15 +195,15 @@ class TmdbAdapterTest < Minitest::Test
   def test_fetch_original_title_returns_first_result
     resp = fake_response([result(original_title: "The Substance", vote_average: 7.2)])
 
-    @adapter.stub(:http_get, resp) do
-      assert_equal "The Substance", @adapter.fetch_original_title(@film)
+    @client.stub(:http_get, resp) do
+      assert_equal "The Substance", @client.fetch_original_title(@film)
     end
   end
 
   def test_fetch_original_title_returns_nil_on_empty
     resp = fake_response([])
-    @adapter.stub(:http_get, resp) do
-      assert_nil @adapter.fetch_original_title(@film)
+    @client.stub(:http_get, resp) do
+      assert_nil @client.fetch_original_title(@film)
     end
   end
 
@@ -213,8 +213,8 @@ class TmdbAdapterTest < Minitest::Test
       result(original_title: "Other Film",    vote_average: 3.1, vote_count: 200)
     ])
 
-    @adapter.stub(:http_get, resp) do
-      assert_match(/[[:graph:]]/, @adapter.rating_for(@film).to_s)
+    @client.stub(:http_get, resp) do
+      assert_match(/[[:graph:]]/, @client.rating_for(@film).to_s)
     end
   end
 
@@ -225,23 +225,23 @@ class TmdbAdapterTest < Minitest::Test
       result(original_title: "Ambiguous",     vote_average: 4.0, vote_count: 800)
     ])
 
-    @adapter.stub(:http_get, resp) do
-      assert "#{@adapter.rating_for(@film)}"
+    @client.stub(:http_get, resp) do
+      assert "#{@client.rating_for(@film)}"
     end
   end
 
   def test_rating_for_no_votes_returns_null
     resp = fake_response([result(original_title: "The Substance", vote_average: 7.2, vote_count: 0)])
 
-    @adapter.stub(:http_get, resp) do
-      assert "#{@adapter.rating_for(@film)}"
+    @client.stub(:http_get, resp) do
+      assert "#{@client.rating_for(@film)}"
     end
   end
 
   def test_rating_for_empty_results_returns_null
     resp = fake_response([])
-    @adapter.stub(:http_get, resp) do
-      assert "#{@adapter.rating_for(@film)}"
+    @client.stub(:http_get, resp) do
+      assert "#{@client.rating_for(@film)}"
     end
   end
 end

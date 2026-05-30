@@ -5,7 +5,7 @@ require "uri"
 require_relative "http_client"
 require_relative "rating"
 
-class TmdbAdapter
+class TmdbClient
   include HttpClient
 
   AMBIGUITY_RATIO = 2.0
