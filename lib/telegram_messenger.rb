@@ -5,13 +5,15 @@ require "json"
 require "uri"
 
 class TelegramMessenger
+  DOMAIN = "https://api.telegram.org"
+
   def initialize(token: ENV.fetch("TELEGRAM_BOT_TOKEN"), chat_id: ENV.fetch("TELEGRAM_CHAT_ID"))
     @token   = token
     @chat_id = chat_id
   end
 
   def send_message(text)
-    uri = URI("https://api.telegram.org/bot#{@token}/sendMessage")
+    uri = URI("#{DOMAIN}/bot#{@token}/sendMessage")
     req = Net::HTTP::Post.new(uri)
     req.content_type = "application/json"
     req.body = JSON.generate(chat_id: @chat_id, text: text, parse_mode: "HTML")

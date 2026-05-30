@@ -8,6 +8,7 @@ require_relative "rating"
 class TmdbClient
   include HttpClient
 
+  DOMAIN          = "https://api.themoviedb.org"
   AMBIGUITY_RATIO = 2.0
 
   def initialize(api_key: ENV.fetch("TMDB_API_KEY"))
@@ -39,7 +40,7 @@ class TmdbClient
   def search(title, year = nil)
     query = URI.encode_www_form(query: title, language: "es-ES", api_key: @api_key)
     query += "&year=#{year}" if year
-    resp = http_get("https://api.themoviedb.org/3/search/movie?#{query}")
+    resp = http_get("#{DOMAIN}/3/search/movie?#{query}")
     return nil unless resp.code == "200"
 
     JSON.parse(resp.body)["results"] || []
