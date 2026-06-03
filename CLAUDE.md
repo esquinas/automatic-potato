@@ -45,6 +45,7 @@ lib/
   weekly_notifier.rb    # orchestrator: collect → enrich → render → send
 bin/run.rb              # thin entry point: four plain .new calls
 config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, check_vo flag)
+.mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # minitest 5 with inline Gemfile, stubbed HTTP
 .github/workflows/
   test.yml              # runs ruby test.rb on every push and PR
@@ -87,8 +88,9 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 ## TMDB matching strategy
 
 1. Search by Spanish title + year (`/3/search/movie?query=...&year=...&language=es-ES`).
-2. If top two results have rating ratio < 2×, return `Rating.null` (ambiguous match — no rating shown).
-3. No cache: ~10 films/week is well within TMDB free tier (50 req/s).
+2. If the top result has zero votes, return `Rating.null`.
+3. If top two results have rating ratio < 2×, return `Rating.null` (ambiguous match — no rating shown).
+4. No cache: ~10 films/week is well within TMDB free tier (50 req/s).
 
 `TmdbClient` exposes two pure queries: `fetch_original_title(film)` and `rating_for(film)`. Mutation (`film.title =`) stays in `WeeklyNotifier`.
 
