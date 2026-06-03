@@ -2,7 +2,7 @@ name: Weekly VO Cinema Notifier
 
 on:
   schedule:
-    - cron: '0 8 * * 1'  # Mondays 08:00 UTC
+    - cron: '0 14 * * 1'  # Mondays 14:00 UTC
   workflow_dispatch:
 
 jobs:

@@ -49,7 +49,7 @@ config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, ch
 test.rb                 # minitest 5 with inline Gemfile, stubbed HTTP
 .github/workflows/
   test.yml              # runs ruby test.rb on every push and PR
-  weekly.yml            # Monday 08:00 UTC cron + workflow_dispatch
+  weekly.yml            # Monday 14:00 UTC cron + workflow_dispatch
 ```
 
 ### Naming conventions
