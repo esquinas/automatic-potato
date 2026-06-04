@@ -1,2 +1,12 @@
 [tools]
 ruby = "3.3"
+
+[env]
+# Telegram Bot API token (get from @BotFather on Telegram)
+# TELEGRAM_BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+
+# Telegram chat ID where the notifier sends messages
+# TELEGRAM_CHAT_ID = "-1001234567890"
+
+# TMDB API key (free tier at https://www.themoviedb.org/settings/api)
+# TMDB_API_KEY = "abcdef1234567890abcdef1234567890"
