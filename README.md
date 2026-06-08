@@ -19,3 +19,41 @@ Configure secrets in `.mise.toml` — see the `[env]` section for required varia
 ## Local Development
 
 To test locally, set environment variables in `.mise.toml` or your shell, then run `ruby bin/run.rb`.
+
+## Output Format
+
+### Telegram (HTML formatting with pre-formatted text)
+```
+Yelmo Cines Ocimax Gijón — 2026-06-08 → 2026-06-14
+
+La Sustancia ★ 7.5
+<pre>
+• Fri →        18:15
+• Sat → 16:15, 18:15
+• Sun → 16:15, 18:15
+</pre>
+
+Didi ★ 6.2
+<pre>
+• Fri → 19:30
+• Sat → 19:30
+• Sun → 19:30
+</pre>
+```
+
+### Stdout (plain text, for local testing)
+```
+Yelmo Cines Ocimax Gijón — 2026-06-08 → 2026-06-14
+
+La Sustancia (Substance, The) 7.5
+Fri: 18:15
+Sat: 16:15, 18:15
+Sun: 16:15, 18:15
+
+Didi 6.2
+Fri: 19:30
+Sat: 19:30
+Sun: 19:30
+```
+
+Times are right-aligned in Telegram for clean column alignment. Each cinema is followed by a week date range, then films with ratings and session times.

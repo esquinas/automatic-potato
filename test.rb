@@ -18,6 +18,8 @@ require_relative "lib/sensacine_client"
 require_relative "lib/tmdb_client"
 require_relative "lib/weekly_notifier"
 require_relative "lib/stdout_messenger"
+require_relative "lib/html_message"
+require_relative "lib/plain_message"
 
 # ---------------------------------------------------------------------------
 # Film
