@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
+require "date"
+
 class PlainMessage
+  WEEK_DAYS = 7
   def render_film(film, rating, sessions)
     parts = [film.localized_title]
     parts << "(#{film.title})" if film.title && film.title.downcase != film.localized_title.downcase
@@ -12,7 +15,7 @@ class PlainMessage
       .transform_values { |ss| ss.map(&:starts_at).sort.uniq }
       .sort.to_h
 
-    showtime_lines = if dates_map.keys.length == 7
+    showtime_lines = if dates_map.keys.length == WEEK_DAYS
       all_times = dates_map.values.flatten.sort.uniq
       ["All week: #{dates_map.keys.min} → #{dates_map.keys.max}: #{all_times.join(", ")}"]
     else

@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
+require "date"
+
 class HtmlMessage
+  WEEK_DAYS = 7
   def render_film(film, rating, sessions)
     parts = ["<b>#{film.localized_title}</b>"]
     parts << "<i>(#{film.title})</i>" if film.title && film.title.downcase != film.localized_title.downcase
@@ -12,7 +15,7 @@ class HtmlMessage
       .transform_values { |ss| ss.map(&:starts_at).sort.uniq }
       .sort.to_h
 
-    showtime_lines = if dates_map.keys.length == 7
+    showtime_lines = if dates_map.keys.length == WEEK_DAYS
       all_times = dates_map.values.flatten.sort.uniq
       max_time_width = all_times.map(&:length).max
       formatted_times = all_times.map { |t| t.rjust(max_time_width) }
