@@ -1,47 +1,36 @@
 # frozen_string_literal: true
 
 require "date"
+require_relative "digest_formatter"
 
 class WeeklyNotifier
-  TELEGRAM_MAX_MSG_CHARS = 3800
-  WEEK_DAYS              = 7
+  WEEK_DAYS    = 7
+  CinemaDigest = Data.define(:cinema, :sessions, :ratings)
 
-  def initialize(showtimes:, movies_db:, messenger:, cinemas:)
+  def initialize(showtimes:, movies_db:, messenger:, cinemas:, formatter: DigestFormatter.new)
     @showtimes = showtimes
     @movies_db = movies_db
     @messenger = messenger
     @cinemas   = cinemas
+    @formatter = formatter
   end
 
   def run(today: Date.today)
-    lines         = []
-    no_vo_cinemas = []
-
-    @cinemas.each do |cinema|
-      sessions = collect_sessions(cinema, today)
-
-      if sessions.empty?
-        no_vo_cinemas << cinema["name"]
-        next
-      end
-
-      lines.concat(render_cinema(cinema, sessions, today))
-      lines << ""
-    end
-
-    unless no_vo_cinemas.empty?
-      lines << "The following venues had no VO sessions: #{no_vo_cinemas.join(", ")}"
-      lines << ""
-    end
-
-    message = lines.join("\n").strip
-    message = "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
-
-    @messenger.send_message(message)
-    puts "Sent #{message.length} chars"
+    digests = @cinemas.map { |cinema| build_cinema_digest(cinema, today) }
+    @messenger.send_message(@formatter.format(digests, today: today))
   end
 
   private
+
+  def build_cinema_digest(cinema, today)
+    sessions = collect_sessions(cinema, today)
+    return CinemaDigest.new(cinema: cinema, sessions: sessions, ratings: {}) if sessions.empty?
+
+    films = sessions.map(&:film).uniq
+    films.each { |film| film.title = @movies_db.fetch_original_title(film) }
+    ratings = films.to_h { |film| [film, @movies_db.rating_for(film)] }
+    CinemaDigest.new(cinema: cinema, sessions: sessions, ratings: ratings)
+  end
 
   def collect_sessions(cinema, today)
     WEEK_DAYS.times.flat_map do |offset|
@@ -49,55 +38,5 @@ class WeeklyNotifier
       sessions = @showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
       cinema["check_vo"] ? sessions.select(&:original_version?) : sessions
     end
-  end
-
-  def render_cinema(cinema, sessions, today)
-    week_end     = (today + WEEK_DAYS - 1).to_s
-    unique_films = sessions.map(&:film).uniq
-
-    unique_films.each { |film| film.title = @movies_db.fetch_original_title(film) }
-
-    film_lines = unique_films.flat_map do |film|
-      render_film(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
-    end
-
-    [cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}"), *film_lines]
-  end
-
-  def render_film(film, rating, sessions)
-    parts = ["<b>#{film.localized_title}</b>"]
-    parts << "<i>(#{film.title})</i>" if film.title && film.title.downcase != film.localized_title.downcase
-    parts << rating
-    title_line = parts.join(" ").strip
-
-    dates_map = sessions
-      .group_by(&:date)
-      .transform_values { |ss| ss.map(&:starts_at).sort.uniq }
-      .sort.to_h
-
-    showtime_lines = if dates_map.keys.length == WEEK_DAYS
-      all_times = dates_map.values.flatten.sort.uniq
-      max_time_width = all_times.map(&:length).max
-      formatted_times = all_times.map { |t| t.rjust(max_time_width) }
-      ["<pre>• All week: #{dates_map.keys.min} → #{dates_map.keys.max}\n  #{formatted_times.join(", ")}</pre>"]
-    else
-      all_times = dates_map.values.flatten.sort.uniq
-      max_time_width = all_times.map(&:length).max
-      lines = dates_map.map do |date, times|
-        formatted_times = times.map { |t| t.rjust(max_time_width) }
-        "• #{weekday(date)} → #{formatted_times.join(", ")}"
-      end
-      ["<pre>#{lines.join("\n")}</pre>"]
-    end
-
-    ["", title_line, *showtime_lines]
-  end
-
-  def cinema_header(cinema, label)
-    cinema["url"] ? "<b><a href=\"#{cinema["url"]}\">#{label}</a></b>" : "<b>#{label}</b>"
-  end
-
-  def weekday(date_str)
-    Date.parse(date_str).strftime("%a")
   end
 end
