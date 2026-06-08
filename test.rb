@@ -16,6 +16,8 @@ require_relative "lib/screening_session"
 require_relative "lib/rating"
 require_relative "lib/sensacine_client"
 require_relative "lib/tmdb_client"
+require_relative "lib/weekly_notifier"
+require_relative "lib/stdout_messenger"
 
 # ---------------------------------------------------------------------------
 # Film
@@ -243,5 +245,118 @@ class TmdbClientTest < Minitest::Test
     @client.stub(:http_get, resp) do
       assert "#{@client.rating_for(@film)}"
     end
+  end
+end
+
+# ---------------------------------------------------------------------------
+# WeeklyNotifier
+# ---------------------------------------------------------------------------
+
+class WeeklyNotifierTest < Minitest::Test
+  def setup
+    @film = Film.new(localized_title: "La sustancia", year: 2024)
+    @film.title = "The Substance"
+    @messenger = StdoutMessenger.new
+    @cinemas = [{ "name" => "Test Cinema", "id" => "1", "url" => "http://example.com", "check_vo" => false }]
+  end
+
+  def stub_showtimes_for_dates(sessions_by_date)
+    showtimes = Minitest::Mock.new
+    7.times do |offset|
+      date = (Date.new(2024, 11, 15) + offset).to_s
+      sessions = sessions_by_date[date] || []
+      showtimes.expect(:fetch_theater_movie_sessions, sessions, date: date, theater_id: "1")
+    end
+    showtimes
+  end
+
+  def test_session_formatting_without_padding
+    sessions_by_date = { "2024-11-15" => [ScreeningSession.new(film: @film, date: "2024-11-15", starts_at: "19:30", original_version?: true)] }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, "The Substance", [@film])
+    movies_db.expect(:rating_for, Rating.null, [@film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier.run(today: Date.new(2024, 11, 15))
+
+    # Session line should NOT have extra padding/alignment
+    assert_match(/• Fri → 19:30/, output)
+    # Ensure it's NOT over-padded with extra spaces
+    refute_match(/• Fri\s{2,}→\s{2,}19:30/, output)
+  end
+
+  def test_session_formatting_multiple_times
+    sessions_by_date = {
+      "2024-11-15" => [
+        ScreeningSession.new(film: @film, date: "2024-11-15", starts_at: "19:30", original_version?: true),
+        ScreeningSession.new(film: @film, date: "2024-11-15", starts_at: "21:00", original_version?: true)
+      ]
+    }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, "The Substance", [@film])
+    movies_db.expect(:rating_for, Rating.null, [@film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier.run(today: Date.new(2024, 11, 15))
+
+    # Times should be comma-separated without padding
+    assert_match(/• Fri → 19:30, 21:00/, output)
+  end
+
+  def test_session_formatting_multiple_days
+    sessions_by_date = {
+      "2024-11-15" => [ScreeningSession.new(film: @film, date: "2024-11-15", starts_at: "19:30", original_version?: true)],
+      "2024-11-16" => [
+        ScreeningSession.new(film: @film, date: "2024-11-16", starts_at: "18:30", original_version?: true),
+        ScreeningSession.new(film: @film, date: "2024-11-16", starts_at: "20:15", original_version?: true)
+      ]
+    }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, "The Substance", [@film])
+    movies_db.expect(:rating_for, Rating.null, [@film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier.run(today: Date.new(2024, 11, 15))
+
+    # Each day should be on its own line without padding alignment
+    assert_match(/• Fri → 19:30/, output)
+    assert_match(/• Sat → 18:30, 20:15/, output)
+  end
+
+  def test_session_lines_wrapped_in_pre_tags
+    sessions_by_date = { "2024-11-15" => [ScreeningSession.new(film: @film, date: "2024-11-15", starts_at: "19:30", original_version?: true)] }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, "The Substance", [@film])
+    movies_db.expect(:rating_for, Rating.null, [@film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier.run(today: Date.new(2024, 11, 15))
+
+    # Session lines should be wrapped in <pre> tags for monospace rendering
+    assert_match(/<pre>.*• Fri → 19:30.*<\/pre>/m, output)
   end
 end
