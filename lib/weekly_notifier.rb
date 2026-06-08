@@ -2,6 +2,7 @@
 
 require "date"
 require_relative "constants"
+require_relative "screening_collection"
 require_relative "html_message"
 
 class WeeklyNotifier
@@ -60,7 +61,8 @@ class WeeklyNotifier
     unique_films.each { |film| film.title = @movies_db.fetch_original_title(film) }
 
     film_lines = unique_films.flat_map do |film|
-      @message_renderer.render_film(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
+      collection = ScreeningCollection.new(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
+      @message_renderer.render_film(collection)
     end
 
     [cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}"), *film_lines]
