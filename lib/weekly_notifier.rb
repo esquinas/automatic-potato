@@ -79,7 +79,7 @@ class WeeklyNotifier
       all_times = dates_map.values.flatten.sort.uniq
       ["  All week: #{dates_map.keys.min} → #{dates_map.keys.max}: #{all_times.join(", ")}"]
     else
-      dates_map.map { |date, times| "  #{format_date(date)}: #{times.join(", ")}" }
+      dates_map.map { |date, times| "  <b>#{weekday(date)}</b> → #{times.join(", ")}" }
     end
 
     ["", title_line, *showtime_lines]
@@ -89,8 +89,7 @@ class WeeklyNotifier
     cinema["url"] ? "<b><a href=\"#{cinema["url"]}\">#{label}</a></b>" : "<b>#{label}</b>"
   end
 
-  def format_date(date_str)
-    date = Date.parse(date_str)
-    "#{date.strftime("%a")} #{date_str}"
+  def weekday(date_str)
+    Date.parse(date_str).strftime("%a")
   end
 end
