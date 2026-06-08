@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require "date"
+require_relative "constants"
 
 class HtmlMessage
-  WEEK_DAYS = 7
   def render_film(film, rating, sessions)
     parts = ["<b>#{film.localized_title}</b>"]
     parts << "<i>(#{film.title})</i>" if film.title && film.title.downcase != film.localized_title.downcase

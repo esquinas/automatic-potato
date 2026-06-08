@@ -11,6 +11,7 @@ end
 require "minitest/autorun"
 require "minitest/mock"
 require "json"
+require_relative "lib/constants"
 require_relative "lib/film"
 require_relative "lib/screening_session"
 require_relative "lib/rating"

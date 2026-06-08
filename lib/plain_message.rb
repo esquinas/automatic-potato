@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require "date"
+require_relative "constants"
 
 class PlainMessage
-  WEEK_DAYS = 7
   def render_film(film, rating, sessions)
     parts = [film.localized_title]
     parts << "(#{film.title})" if film.title && film.title.downcase != film.localized_title.downcase

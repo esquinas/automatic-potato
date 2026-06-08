@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require "date"
+require_relative "constants"
 require_relative "html_message"
 
 class WeeklyNotifier
   TELEGRAM_MAX_MSG_CHARS = 3800
-  WEEK_DAYS              = 7
 
   def initialize(showtimes:, movies_db:, messenger:, cinemas:, message_renderer: HtmlMessage.new)
     @showtimes         = showtimes
