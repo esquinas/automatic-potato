@@ -3,36 +3,26 @@
 require "json"
 require "uri"
 require_relative "http_client"
-require_relative "rating"
+require_relative "mappers/tmdb_movie_mapper"
 
 class TmdbClient
   include HttpClient
 
-  DOMAIN          = "https://api.themoviedb.org"
-  AMBIGUITY_RATIO = 2.0
+  DOMAIN = "https://api.themoviedb.org"
 
-  def initialize(api_key: ENV.fetch("TMDB_API_KEY"))
+  def initialize(api_key: ENV.fetch("TMDB_API_KEY"), mapper: Mappers::TmdbMovieMapper.new)
     @api_key = api_key
+    @mapper = mapper
   end
 
   def fetch_original_title(film)
-    search(film.localized_title, film.year)&.first&.dig("original_title")
+    results = search(film.localized_title, film.year)
+    @mapper.extract_title(results)
   end
 
   def rating_for(film)
     results = search(film.title || film.localized_title, film.year)
-    return Rating.null if results.nil? || results.empty?
-
-    top    = results[0]
-    second = results[1]
-
-    return Rating.null if top["vote_count"].to_i.zero?
-
-    top_score    = top["vote_average"].to_f
-    second_score = (second&.dig("vote_average") || 0).to_f
-    return Rating.null if second_score > 0 && top_score / second_score < AMBIGUITY_RATIO
-
-    Rating.new(score: top_score)
+    @mapper.extract_rating(results)
   end
 
   private

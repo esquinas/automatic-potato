@@ -2,17 +2,16 @@
 
 require "json"
 require_relative "http_client"
-require_relative "film"
-require_relative "screening_session"
+require_relative "parsers/sensacine_session_parser"
 
 class SensacineClient
   include HttpClient
 
-  DOMAIN             = "https://www.sensacine.com"
-  VO_BUCKETS         = %w[original local].freeze
-  UNFILTERED_BUCKETS = %w[original local dubbed].freeze
+  DOMAIN = "https://www.sensacine.com"
 
-  def initialize(**) = nil
+  def initialize(parser: Parsers::SensacineSessionParser.new)
+    @parser = parser
+  end
 
   HEADERS = {
     "User-Agent"      => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -29,33 +28,6 @@ class SensacineClient
     puts "HTTP #{resp.code}"
     return [] unless resp.code == "200"
 
-    parse_sessions(JSON.parse(resp.body)["results"] || [], date)
-  end
-
-  private
-
-  def parse_sessions(results, date)
-    results.flat_map do |entry|
-      film = Film.new(
-        localized_title: entry.dig("movie", "title") || "(untitled)",
-        year:            entry.dig("movie", "release", "year")
-      )
-
-      UNFILTERED_BUCKETS.flat_map do |bucket|
-        original_version = VO_BUCKETS.include?(bucket)
-
-        (entry.dig("showtimes", bucket) || []).filter_map do |showtime|
-          starts_at = showtime["startsAt"]&.slice(11, 5)
-          next unless starts_at
-
-          ScreeningSession.new(
-            film:              film,
-            date:              date,
-            starts_at:         starts_at,
-            original_version?: original_version
-          )
-        end
-      end
-    end
+    @parser.parse(JSON.parse(resp.body)["results"] || [], date)
   end
 end

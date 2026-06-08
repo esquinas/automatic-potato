@@ -2,7 +2,9 @@
 
 require "date"
 require_relative "constants"
-require_relative "screening_collection"
+require_relative "services/film_enricher"
+require_relative "services/film_session_grouper"
+require_relative "presenters/film_presentation"
 require_relative "html_message"
 
 class WeeklyNotifier
@@ -14,6 +16,8 @@ class WeeklyNotifier
     @messenger         = messenger
     @cinemas           = cinemas
     @message_renderer  = message_renderer
+    @enricher          = Services::FilmEnricher.new(movies_db)
+    @grouper           = Services::FilmSessionGrouper.new(movies_db)
   end
 
   def run(today: Date.today)
@@ -55,14 +59,14 @@ class WeeklyNotifier
   end
 
   def render_cinema(cinema, sessions, today)
-    week_end     = (today + WEEK_DAYS - 1).to_s
-    unique_films = sessions.map(&:film).uniq
+    week_end = (today + WEEK_DAYS - 1).to_s
 
-    unique_films.each { |film| film.title = @movies_db.fetch_original_title(film) }
+    @enricher.enrich(sessions)
+    collections = @grouper.group(sessions)
 
-    film_lines = unique_films.flat_map do |film|
-      collection = ScreeningCollection.new(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
-      @message_renderer.render_film(collection)
+    film_lines = collections.flat_map do |collection|
+      presentation = Presenters::FilmPresentation.from_screening_collection(collection)
+      @message_renderer.render_film(presentation)
     end
 
     [cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}"), *film_lines]

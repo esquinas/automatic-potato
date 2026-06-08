@@ -1,24 +1,24 @@
 # frozen_string_literal: true
 
 require "date"
-require_relative "screening_collection"
 
 class HtmlMessage
-  def render_film(collection)
-    parts = ["<b>#{collection.film.localized_title}</b>"]
-    parts << "<i>(#{collection.film.title})</i>" if collection.film.title && collection.film.title.downcase != collection.film.localized_title.downcase
-    parts << collection.rating
+  def render_film(presentation)
+    parts = ["<b>#{presentation.film.localized_title}</b>"]
+    parts << "<i>(#{presentation.film.title})</i>" if presentation.film.title && presentation.film.title.downcase != presentation.film.localized_title.downcase
+    parts << presentation.rating
     title_line = parts.join(" ").strip
 
-    showtime_lines = if collection.full_week?
-      all_times = collection.all_times
-      max_time_width = all_times.map(&:length).max
-      formatted_times = all_times.map { |t| t.rjust(max_time_width) }
-      ["<pre>• All week: #{collection.dates_map.keys.min} → #{collection.dates_map.keys.max}\n  #{formatted_times.join(", ")}</pre>"]
+    showtime_lines = if presentation.full_week
+      times = presentation.date_time_structure[:times]
+      max_time_width = times.map(&:length).max
+      formatted_times = times.map { |t| t.rjust(max_time_width) }
+      ["<pre>• All week: #{presentation.date_time_structure[:range_start]} → #{presentation.date_time_structure[:range_end]}\n  #{formatted_times.join(", ")}</pre>"]
     else
-      all_times = collection.all_times
+      dates = presentation.date_time_structure[:dates]
+      all_times = dates.values.flatten.sort.uniq
       max_time_width = all_times.map(&:length).max
-      lines = collection.dates_map.map do |date, times|
+      lines = dates.map do |date, times|
         formatted_times = times.map { |t| t.rjust(max_time_width) }
         "• #{weekday(date)} → #{formatted_times.join(", ")}"
       end
