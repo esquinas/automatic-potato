@@ -34,16 +34,20 @@ Each class reads its own secrets from ENV as default keyword arguments — plain
 
 ```
 lib/
-  http_client.rb        # shared HTTP module (retry, jitter) — included by clients
-  sensacine_client.rb   # fetches showtimes from SensaCine internal JSON API
-  tmdb_client.rb        # searches TMDB for original title + rating
-  telegram_messenger.rb # sends message via Telegram Bot API
-  stdout_messenger.rb   # sends message to stdout (dev/testing)
-  film.rb               # mutable PORO: localized_title + year always set; title filled after TMDB lookup
-  screening_session.rb  # Data.define: film, date, starts_at, original_version?
-  rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
-  weekly_notifier.rb    # orchestrator: collect → enrich → render → send
-bin/run.rb              # thin entry point: four plain .new calls
+  http_client.rb           # shared HTTP module (retry, jitter) — included by clients
+  sensacine_client.rb      # fetches showtimes from SensaCine internal JSON API
+  tmdb_client.rb           # searches TMDB for original title + rating
+  telegram_messenger.rb    # sends message via Telegram Bot API (truncates to its own limit)
+  stdout_messenger.rb      # sends message to stdout (dev/testing)
+  plain_text_formatter.rb  # renders a WeeklyDigest; owns the rendering algorithm, neutral markup
+  html_formatter.rb        # subclass of PlainTextFormatter; overrides only bold/italic/link/preformatted
+  cinema.rb                # Data.define: id, name, url, check_vo? (+ .from_h for YAML rows)
+  film.rb                  # mutable PORO: localized_title + year always set; title filled after TMDB lookup
+  screening_session.rb     # Data.define: film, date, starts_at, original_version?
+  rating.rb                # Data.define with .null sentinel; to_s/to_str safe for string interpolation
+  weekly_digest.rb         # Data.define aggregate: WeeklyDigest → CinemaProgram → FilmListing
+  weekly_notifier.rb       # orchestrator: collect → enrich → render → send
+bin/run.rb              # thin entry point: five plain .new calls
 config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, check_vo flag)
 .mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # minitest 5 with inline Gemfile, stubbed HTTP
@@ -56,16 +60,17 @@ test.rb                 # minitest 5 with inline Gemfile, stubbed HTTP
 
 - `*Client` — queries an external API (`SensacineClient`, `TmdbClient`)
 - `*Messenger` — delivers output (`TelegramMessenger`, `StdoutMessenger`)
-- All Clients and all Messengers share the same call site: plain `.new`. Classes with no config use `def initialize(**) = nil`.
+- `*Formatter` — renders a `WeeklyDigest` into a message string (`HtmlFormatter`, `PlainTextFormatter`)
+- All Clients, Messengers and Formatters share the same call site: plain `.new`. Classes with no config use `def initialize(**) = nil`.
 - Each class exposes a `DOMAIN` constant at the top for its base URL.
 
 ### `WeeklyNotifier` interface
 
 ```ruby
-WeeklyNotifier.new(showtimes:, movies_db:, messenger:, cinemas:).run(today: Date.today)
+WeeklyNotifier.new(showtimes:, movies_db:, formatter:, messenger:, cinemas:).run(today: Date.today)
 ```
 
-Any conforming Client or Messenger can be swapped in without touching the orchestrator.
+Any conforming Client, Formatter or Messenger can be swapped in without touching the orchestrator. `cinemas:` takes `Cinema` value objects (built from `cinemas.yml` via `Cinema.from_h`).
 
 ## SensaCine API
 
@@ -114,4 +119,12 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 
 **`HttpClient` is a module, not a base class** — shared retry-with-jitter logic is included by `SensacineClient` and `TmdbClient`. The module keeps it encapsulated without imposing an inheritance hierarchy.
 
-**`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+**`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `formatter:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+
+**Formatting lives in Formatters, not the orchestrator** — `WeeklyNotifier` builds a `WeeklyDigest` (pure data: date range, per-cinema programs, quiet venues) and hands it to a Formatter. `PlainTextFormatter` owns the whole rendering algorithm with neutral markup primitives (`bold`, `italic`, `link`, `preformatted` are identity functions); `HtmlFormatter` subclasses it and overrides only those four one-liners (template method). A new output format is a handful of primitive overrides, never a copy of the algorithm.
+
+**`WeeklyDigest` is a `Data.define` aggregate** — `WeeklyDigest → CinemaProgram → FilmListing`. Fully resolved before rendering, so Formatters never reach into clients or YAML hashes. `FilmListing#showtimes_by_date` keeps session grouping with the data, leaving Formatters with presentation only (weekday names, alignment, "All week" collapse).
+
+**`Cinema` is a `Data.define` value object** — built from `cinemas.yml` rows via `Cinema.from_h` in `bin/run.rb`, so the rest of the app says `cinema.name` / `cinema.check_vo?` instead of poking string-keyed hashes.
+
+**Telegram's message limit lives in `TelegramMessenger`** — truncation to `MAX_MSG_CHARS` is a transport concern of the Telegram Bot API, applied inside `send_message`, invisible to the orchestrator.

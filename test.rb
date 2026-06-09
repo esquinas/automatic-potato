@@ -12,10 +12,14 @@ require "minitest/autorun"
 require "minitest/mock"
 require "json"
 require_relative "lib/film"
+require_relative "lib/cinema"
 require_relative "lib/screening_session"
 require_relative "lib/rating"
 require_relative "lib/sensacine_client"
 require_relative "lib/tmdb_client"
+require_relative "lib/weekly_digest"
+require_relative "lib/plain_text_formatter"
+require_relative "lib/html_formatter"
 require_relative "lib/weekly_notifier"
 require_relative "lib/stdout_messenger"
 
@@ -51,6 +55,18 @@ class FilmTest < Minitest::Test
     film = Film.new(localized_title: "La sustancia", year: 2024)
     h = { film => :found }
     assert_equal :found, h[Film.new(localized_title: "La sustancia", year: 2024)]
+  end
+
+  def test_translated_when_original_title_differs
+    film = Film.new(localized_title: "La sustancia", year: 2024, title: "The Substance")
+    assert film.translated?
+  end
+
+  def test_not_translated_when_titles_match_or_title_unknown
+    same    = Film.new(localized_title: "Nosferatu", year: 2024, title: "NOSFERATU")
+    unknown = Film.new(localized_title: "Nosferatu", year: 2024)
+    refute same.translated?
+    refute unknown.translated?
   end
 end
 
@@ -249,6 +265,50 @@ class TmdbClientTest < Minitest::Test
 end
 
 # ---------------------------------------------------------------------------
+# Formatters
+# ---------------------------------------------------------------------------
+
+class FormatterTest < Minitest::Test
+  def setup
+    film = Film.new(localized_title: "La sustancia", year: 2024, title: "The Substance")
+    cinema = Cinema.new(id: "1", name: "Test Cinema", url: "http://example.com", check_vo?: true)
+    sessions = [
+      ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "19:30", original_version?: true),
+      ScreeningSession.new(film: film, date: "2024-11-16", starts_at: "21:00", original_version?: true)
+    ]
+    listing = FilmListing.new(film: film, rating: Rating.new(score: 7.2), sessions: sessions)
+    @digest = WeeklyDigest.new(
+      from:          Date.new(2024, 11, 15),
+      to:            Date.new(2024, 11, 21),
+      programs:      [CinemaProgram.new(cinema: cinema, listings: [listing])],
+      quiet_cinemas: ["Quiet Cinema"]
+    )
+  end
+
+  def test_html_wraps_titles_in_markup
+    output = HtmlFormatter.new.render(@digest)
+    assert_match %r{<b>La sustancia</b>}, output
+    assert_match %r{<i>\(The Substance\)</i>}, output
+    assert_match %r{<a href="http://example.com">Test Cinema}, output
+    assert_match %r{<pre>.*• Fri → 19:30.*</pre>}m, output
+  end
+
+  def test_plain_text_has_same_content_without_markup
+    output = PlainTextFormatter.new.render(@digest)
+    refute_match(/<[a-z]+>/, output)
+    assert_match(/La sustancia \(The Substance\)/, output)
+    assert_match(/• Fri → 19:30/, output)
+    assert_match(/• Sat → 21:00/, output)
+  end
+
+  def test_lists_cinemas_without_vo_sessions
+    [HtmlFormatter, PlainTextFormatter].each do |formatter|
+      assert_match(/no VO sessions: Quiet Cinema/, formatter.new.render(@digest))
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
 # WeeklyNotifier
 # ---------------------------------------------------------------------------
 
@@ -257,7 +317,7 @@ class WeeklyNotifierTest < Minitest::Test
     @film = Film.new(localized_title: "La sustancia", year: 2024)
     @film.title = "The Substance"
     @messenger = StdoutMessenger.new
-    @cinemas = [{ "name" => "Test Cinema", "id" => "1", "url" => "http://example.com", "check_vo" => false }]
+    @cinemas = [Cinema.new(id: "1", name: "Test Cinema", url: "http://example.com", check_vo?: false)]
   end
 
   def stub_showtimes_for_dates(sessions_by_date)
@@ -282,7 +342,7 @@ class WeeklyNotifierTest < Minitest::Test
     messenger = Minitest::Mock.new
     messenger.expect(:send_message, nil) { |msg| output = msg }
 
-    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, formatter: HtmlFormatter.new, messenger: messenger, cinemas: @cinemas)
     notifier.run(today: Date.new(2024, 11, 15))
 
     # Session line should have right-aligned times
@@ -306,7 +366,7 @@ class WeeklyNotifierTest < Minitest::Test
     messenger = Minitest::Mock.new
     messenger.expect(:send_message, nil) { |msg| output = msg }
 
-    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, formatter: HtmlFormatter.new, messenger: messenger, cinemas: @cinemas)
     notifier.run(today: Date.new(2024, 11, 15))
 
     # Times should be comma-separated without padding
@@ -331,7 +391,7 @@ class WeeklyNotifierTest < Minitest::Test
     messenger = Minitest::Mock.new
     messenger.expect(:send_message, nil) { |msg| output = msg }
 
-    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, formatter: HtmlFormatter.new, messenger: messenger, cinemas: @cinemas)
     notifier.run(today: Date.new(2024, 11, 15))
 
     # Each day should be on its own line without padding alignment
@@ -351,7 +411,7 @@ class WeeklyNotifierTest < Minitest::Test
     messenger = Minitest::Mock.new
     messenger.expect(:send_message, nil) { |msg| output = msg }
 
-    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, formatter: HtmlFormatter.new, messenger: messenger, cinemas: @cinemas)
     notifier.run(today: Date.new(2024, 11, 15))
 
     # Session lines should be wrapped in <pre> tags for monospace rendering
@@ -384,7 +444,7 @@ class WeeklyNotifierTest < Minitest::Test
     messenger = Minitest::Mock.new
     messenger.expect(:send_message, nil) { |msg| output = msg }
 
-    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+    notifier = WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, formatter: HtmlFormatter.new, messenger: messenger, cinemas: @cinemas)
     notifier.run(today: Date.new(2024, 11, 15))
 
     # All sessions should appear on each day, not truncated

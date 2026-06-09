@@ -5,7 +5,8 @@ require "json"
 require "uri"
 
 class TelegramMessenger
-  DOMAIN = "https://api.telegram.org"
+  DOMAIN        = "https://api.telegram.org"
+  MAX_MSG_CHARS = 3800
 
   def initialize(token: ENV.fetch("TELEGRAM_BOT_TOKEN"), chat_id: ENV.fetch("TELEGRAM_CHAT_ID"))
     @token   = token
@@ -13,6 +14,8 @@ class TelegramMessenger
   end
 
   def send_message(text)
+    text = "#{text[0, MAX_MSG_CHARS]}\n... (truncated)" if text.length > MAX_MSG_CHARS
+
     uri = URI("#{DOMAIN}/bot#{@token}/sendMessage")
     req = Net::HTTP::Post.new(uri)
     req.content_type = "application/json"

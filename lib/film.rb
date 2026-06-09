@@ -9,6 +9,11 @@ class Film
     @year            = year
   end
 
+  # The local release title differs from the original title.
+  def translated?
+    title && title.downcase != localized_title.downcase
+  end
+
   def ==(other)
     other.is_a?(Film) && localized_title == other.localized_title && year == other.year
   end
