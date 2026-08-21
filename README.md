@@ -10,8 +10,8 @@ Install [mise](https://mise.jdx.dev) to manage Ruby versions and environment var
 
 ```bash
 mise install
-ruby test.rb          # run tests
-ruby bin/run.rb       # run the notifier
+ruby test.rb         # run tests
+ruby bin/run.rb      # run the notifier
 ```
 
 Configure secrets in `.mise.toml` — see the `[env]` section for required variables (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TMDB_API_KEY`). GitHub Actions reads them from repository secrets instead.
