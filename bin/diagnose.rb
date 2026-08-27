@@ -1,0 +1,92 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "net/http"
+require "json"
+require "uri"
+require "date"
+require "yaml"
+
+def http_get(url, headers = {})
+  uri = URI(url)
+  req = Net::HTTP::Get.new(uri, headers)
+  Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 15) { |h| h.request(req) }
+end
+
+def ok(msg)   = puts "[OK]   #{msg}"
+def fail!(msg) = puts "[FAIL] #{msg}"
+def section(title) = puts("\n== #{title} ==")
+
+# ---------------------------------------------------------------------------
+section "TMDB API key"
+tmdb_key = ENV["TMDB_API_KEY"]
+if tmdb_key.nil? || tmdb_key.empty?
+  fail! "TMDB_API_KEY not set"
+else
+  resp = http_get("https://api.themoviedb.org/3/configuration?api_key=#{tmdb_key}")
+  if resp.code == "200"
+    ok "Key valid (HTTP 200)"
+  else
+    fail! "HTTP #{resp.code} — #{resp.body[0, 300]}"
+  end
+end
+
+# ---------------------------------------------------------------------------
+section "Telegram bot token"
+tg_token = ENV["TELEGRAM_BOT_TOKEN"]
+tg_chat  = ENV["TELEGRAM_CHAT_ID"]
+
+if tg_token.nil? || tg_token.empty?
+  fail! "TELEGRAM_BOT_TOKEN not set"
+else
+  resp = http_get("https://api.telegram.org/bot#{tg_token}/getMe")
+  body = JSON.parse(resp.body) rescue {}
+  if resp.code == "200" && body["ok"]
+    ok "Token valid — bot @#{body.dig("result", "username")}"
+  else
+    fail! "HTTP #{resp.code} — #{resp.body[0, 300]}"
+  end
+end
+
+if tg_chat.nil? || tg_chat.empty?
+  fail! "TELEGRAM_CHAT_ID not set"
+else
+  ok "TELEGRAM_CHAT_ID set (#{tg_chat})"
+end
+
+# ---------------------------------------------------------------------------
+section "SensaCine raw probe (first cinema, today)"
+cinemas = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"]
+cinema  = cinemas.first
+date    = Date.today.to_s
+url     = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/p-1/"
+headers = {
+  "User-Agent"      => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept"          => "application/json",
+  "Accept-Language" => "es-ES,es;q=0.9",
+  "Referer"         => "https://www.sensacine.com/cines/cine/"
+}
+
+puts "Cinema : #{cinema["name"]} (id=#{cinema["id"]})"
+puts "Date   : #{date}"
+puts "URL    : #{url}"
+
+resp = http_get(url, headers)
+puts "HTTP   : #{resp.code}"
+
+if resp.code == "200"
+  parsed  = JSON.parse(resp.body) rescue nil
+  results = parsed&.dig("results") || []
+  pages   = parsed&.dig("pagination", "totalPages")
+  puts "Pages  : #{pages}"
+  puts "Results: #{results.length} movie entries"
+  results.each do |r|
+    title   = r.dig("movie", "title") || "(untitled)"
+    buckets = (r.dig("showtimes") || {}).transform_values(&:length)
+    puts "  #{title}: #{buckets.map { |k, v| "#{k}=#{v}" }.join(", ")}"
+  end
+  puts "(no results)" if results.empty?
+else
+  puts "Response body (first 600 chars):"
+  puts resp.body[0, 600]
+end
