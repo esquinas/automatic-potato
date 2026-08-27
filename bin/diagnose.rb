@@ -55,11 +55,9 @@ else
 end
 
 # ---------------------------------------------------------------------------
-section "SensaCine raw probe (first cinema, today)"
+section "SensaCine raw probe (first cinema, 7 days)"
 cinemas = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"]
 cinema  = cinemas.first
-date    = Date.today.to_s
-url     = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/p-1/"
 headers = {
   "User-Agent"      => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   "Accept"          => "application/json",
@@ -68,25 +66,18 @@ headers = {
 }
 
 puts "Cinema : #{cinema["name"]} (id=#{cinema["id"]})"
-puts "Date   : #{date}"
-puts "URL    : #{url}"
 
-resp = http_get(url, headers)
-puts "HTTP   : #{resp.code}"
+7.times do |offset|
+  date = (Date.today + offset).to_s
+  url  = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/p-1/"
+  puts "\n--- #{date} ---"
+  puts "URL : #{url}"
 
-if resp.code == "200"
-  parsed  = JSON.parse(resp.body) rescue nil
-  results = parsed&.dig("results") || []
-  pages   = parsed&.dig("pagination", "totalPages")
-  puts "Pages  : #{pages}"
-  puts "Results: #{results.length} movie entries"
-  results.each do |r|
-    title   = r.dig("movie", "title") || "(untitled)"
-    buckets = (r.dig("showtimes") || {}).transform_values(&:length)
-    puts "  #{title}: #{buckets.map { |k, v| "#{k}=#{v}" }.join(", ")}"
-  end
-  puts "(no results)" if results.empty?
-else
-  puts "Response body (first 600 chars):"
-  puts resp.body[0, 600]
+  resp = http_get(url, headers)
+  puts "HTTP: #{resp.code}"
+  puts "Response headers:"
+  resp.each_header { |k, v| puts "  #{k}: #{v}" }
+  puts "Raw body (first 2000 chars):"
+  puts resp.body[0, 2000]
+  puts "(body truncated)" if resp.body.length > 2000
 end
