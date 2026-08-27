@@ -70,7 +70,7 @@ Any conforming Client or Messenger can be swapped in without touching the orches
 ## SensaCine API
 
 ```
-GET https://www.sensacine.com/_/showtimes/theater-{ID}/d-{YYYY-MM-DD}/p-1/
+GET https://www.sensacine.com/_/showtimes/theater-{ID}/d-{YYYY-MM-DD}/
 ```
 
 Headers required: `Referer: https://www.sensacine.com/cines/cine/`, realistic `User-Agent`, `Accept: application/json`.
@@ -81,7 +81,7 @@ Response shape: `results[].movie.title`, `results[].showtimes.{original,dubbed,l
 
 The `check_vo` flag in `cinemas.yml` controls whether `WeeklyNotifier` applies the VO filter for a given venue (some venues screen only VO by policy, so no filter is needed).
 
-**Pagination:** the API paginates; `pagination.totalPages` indicates total. Current implementation fetches page 1 only — sufficient for most venues.
+**Pagination:** the API returns all sessions for a given day in a single response — no `/p-{n}/` path segment is needed or supported (appending it causes the endpoint to return empty results).
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
 

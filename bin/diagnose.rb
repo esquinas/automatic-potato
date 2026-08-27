@@ -55,7 +55,7 @@ else
 end
 
 # ---------------------------------------------------------------------------
-section "SensaCine raw probe (first cinema, 7 days)"
+section "SensaCine probe (first cinema, 7 days)"
 cinemas = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"]
 cinema  = cinemas.first
 headers = {
@@ -69,15 +69,41 @@ puts "Cinema : #{cinema["name"]} (id=#{cinema["id"]})"
 
 7.times do |offset|
   date = (Date.today + offset).to_s
-  url  = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/p-1/"
+  url  = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/"
   puts "\n--- #{date} ---"
-  puts "URL : #{url}"
 
   resp = http_get(url, headers)
   puts "HTTP: #{resp.code}"
-  puts "Response headers:"
-  resp.each_header { |k, v| puts "  #{k}: #{v}" }
-  puts "Raw body (first 2000 chars):"
-  puts resp.body[0, 2000]
-  puts "(body truncated)" if resp.body.length > 2000
+
+  unless resp.code == "200"
+    puts "Body: #{resp.body[0, 300]}"
+    next
+  end
+
+  parsed  = JSON.parse(resp.body) rescue nil
+  unless parsed
+    puts "[FAIL] Could not parse JSON"
+    next
+  end
+
+  if parsed["error"]
+    puts "  API error: #{parsed["message"]} (nextDate: #{parsed["nextDate"]})"
+    next
+  end
+
+  results    = parsed["results"] || []
+  total_pages = parsed.dig("pagination", "totalPages")
+  puts "  totalPages=#{total_pages}  results=#{results.length}"
+
+  results.each do |entry|
+    title    = entry.dig("movie", "title") || "(untitled)"
+    showtimes = entry["showtimes"] || {}
+    puts "  Film: #{title}"
+    puts "    Showtime buckets: #{showtimes.keys.inspect}"
+    showtimes.each do |bucket, sessions|
+      sample = sessions.first&.dig("startsAt") || sessions.first&.dig("time") || "(no startsAt)"
+      puts "    #{bucket}: #{sessions.length} session(s), sample startsAt=#{sample}"
+    end
+  end
+  puts "  (no results for this date)" if results.empty?
 end

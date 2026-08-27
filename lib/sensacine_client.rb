@@ -22,14 +22,20 @@ class SensacineClient
   }.freeze
 
   def fetch_theater_movie_sessions(date:, theater_id:)
-    url = "#{DOMAIN}/_/showtimes/theater-#{theater_id}/d-#{date}/p-1/"
+    url = "#{DOMAIN}/_/showtimes/theater-#{theater_id}/d-#{date}/"
 
     puts "GET #{url}"
     resp = http_get(url, HEADERS)
     puts "HTTP #{resp.code}"
     return [] unless resp.code == "200"
 
-    parse_sessions(JSON.parse(resp.body)["results"] || [], date)
+    parsed = JSON.parse(resp.body)
+    if parsed["error"]
+      puts "  API error: #{parsed["message"]} (nextDate: #{parsed["nextDate"]})"
+      return []
+    end
+
+    parse_sessions(parsed["results"] || [], date)
   end
 
   private
