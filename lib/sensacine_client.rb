@@ -9,8 +9,8 @@ class SensacineClient
   include HttpClient
 
   DOMAIN             = "https://www.sensacine.com"
-  VO_BUCKETS         = %w[original local].freeze
-  UNFILTERED_BUCKETS = %w[original local dubbed].freeze
+  VO_BUCKETS         = %w[original original_st original_sme local local_st local_sme].freeze
+  UNFILTERED_BUCKETS = (VO_BUCKETS + %w[dubbed dubbed_st dubbed_sme]).freeze
 
   def initialize(**) = nil
 
@@ -48,7 +48,7 @@ class SensacineClient
       )
 
       UNFILTERED_BUCKETS.flat_map do |bucket|
-        original_version = VO_BUCKETS.include?(bucket)
+        bucket_is_vo = VO_BUCKETS.include?(bucket)
 
         (entry.dig("showtimes", bucket) || []).filter_map do |showtime|
           starts_at = showtime["startsAt"]&.slice(11, 5)
@@ -58,7 +58,7 @@ class SensacineClient
             film:              film,
             date:              date,
             starts_at:         starts_at,
-            original_version?: original_version
+            original_version?: bucket_is_vo || showtime["diffusionVersion"] == "ORIGINAL"
           )
         end
       end
