@@ -9,15 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
 
+      - name: Install RubyCritic
+        run: gem install rubycritic
+
       - name: Run RubyCritic
-        uses: ptuchster/rubycritic-action@main
-        with:
-          min_score_treshold: 1
-          workdir: lib
+        run: rubycritic --minimum-score 85 --format console --no-browser lib
