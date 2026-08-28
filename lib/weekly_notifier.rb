@@ -6,11 +6,12 @@ class WeeklyNotifier
   TELEGRAM_MAX_MSG_CHARS = 3800
   WEEK_DAYS              = 7
 
-  def initialize(showtimes:, movies_db:, messenger:, cinemas:)
-    @showtimes = showtimes
-    @movies_db = movies_db
-    @messenger = messenger
-    @cinemas   = cinemas
+  def initialize(showtimes:, movies_db:, messenger:, cinemas:, yelmo_showtimes: nil)
+    @showtimes       = showtimes
+    @movies_db       = movies_db
+    @messenger       = messenger
+    @cinemas         = cinemas
+    @yelmo_showtimes = yelmo_showtimes
   end
 
   def run(today: Date.today)
@@ -44,11 +45,28 @@ class WeeklyNotifier
   private
 
   def collect_sessions(cinema, today)
-    WEEK_DAYS.times.flat_map do |offset|
-      date     = (today + offset).to_s
-      sessions = @showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
-      cinema["check_vo"] ? sessions.select(&:original_version?) : sessions
+    sensacine = WEEK_DAYS.times.flat_map do |offset|
+      date = (today + offset).to_s
+      @showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
     end
+
+    if @yelmo_showtimes && cinema["yelmo_id"]
+      yelmo = WEEK_DAYS.times.flat_map do |offset|
+        date = (today + offset).to_s
+        @yelmo_showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["yelmo_id"])
+      end
+      sensacine = merge_sessions(sensacine, yelmo)
+    end
+
+    cinema["check_vo"] ? sensacine.select(&:original_version?) : sensacine
+  end
+
+  def merge_sessions(primary, secondary)
+    by_key = Hash.new { |h, k| h[k] = [] }
+    (primary + secondary).each do |s|
+      by_key[[s.date, s.starts_at, s.film.localized_title.downcase.strip]] << s
+    end
+    by_key.values.map { |group| group.find(&:original_version?) || group.first }
   end
 
   def render_cinema(cinema, sessions, today)
