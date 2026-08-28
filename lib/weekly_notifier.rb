@@ -58,7 +58,18 @@ class WeeklyNotifier
       sensacine = merge_sessions(sensacine, yelmo)
     end
 
-    cinema["check_vo"] ? sensacine.select(&:original_version?) : sensacine
+    return sensacine unless cinema["check_vo"]
+
+    sensacine.select { |s| s.original_version? || spanish_original?(s.film) }
+  end
+
+  # A film with no dubbed/subtitled distinction (e.g. a Spanish production) never
+  # gets tagged VO by a provider, since there's nothing to dub or subtitle — its
+  # only screening IS the original version. TMDB's original_language is the only
+  # way to tell that apart from a foreign film dubbed into Spanish.
+  def spanish_original?(film)
+    @spanish_original_cache ||= {}
+    @spanish_original_cache.fetch(film) { @spanish_original_cache[film] = @movies_db.spanish_original?(film) }
   end
 
   def merge_sessions(primary, secondary)

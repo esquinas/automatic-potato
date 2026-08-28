@@ -92,7 +92,7 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 3. If top two results have rating ratio < 2×, return `Rating.null` (ambiguous match — no rating shown).
 4. No cache: ~10 films/week is well within TMDB free tier (50 req/s).
 
-`TmdbClient` exposes two pure queries: `fetch_original_title(film)` and `rating_for(film)`. Mutation (`film.title =`) stays in `WeeklyNotifier`.
+`TmdbClient` exposes three pure queries: `fetch_original_title(film)`, `rating_for(film)`, and `spanish_original?(film)` (`original_language == "es"` on the top search result). Mutation (`film.title =`) stays in `WeeklyNotifier`.
 
 ## Design decisions
 
@@ -101,6 +101,8 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 **`ScreeningSession` is `Data.define`** — fully resolved at construction time, never mutated.
 
 **`original_version?` resolved by the client** — `VO_BUCKETS.include?(bucket)` lives in `SensacineClient`. Domain objects stay free of provider-specific string vocabulary (`"original"`, `"local"`, `"dubbed"`).
+
+**Spanish-original films fall back to a TMDB check in `WeeklyNotifier`** — a Spanish production is never dubbed or subtitled, so no provider (`SensacineClient`'s buckets, `YelmoClient`'s `VO_LANGUAGES` tags) ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `WeeklyNotifier#collect_sessions` asks `TmdbClient#spanish_original?(film)` before excluding it, and keeps the session if the film's TMDB `original_language` is `"es"`. Results are memoized per `Film` for the run to avoid redundant TMDB calls across the week's sessions.
 
 **`fetch_theater_movie_sessions` takes no filter arg** — the client always returns all sessions with `original_version?` set. The caller (`WeeklyNotifier`) filters with `.select(&:original_version?)` when `check_vo` is true. This keeps the client a pure data source.
 

@@ -248,8 +248,9 @@ class TmdbClientTest < Minitest::Test
     FakeResponse.new("200", JSON.generate("results" => results))
   end
 
-  def result(original_title:, vote_average:, vote_count: 500)
-    { "original_title" => original_title, "vote_average" => vote_average, "vote_count" => vote_count }
+  def result(original_title:, vote_average:, vote_count: 500, original_language: "en")
+    { "original_title" => original_title, "vote_average" => vote_average, "vote_count" => vote_count,
+      "original_language" => original_language }
   end
 
   def test_retrieves_original_title_from_search
@@ -302,6 +303,29 @@ class TmdbClientTest < Minitest::Test
     resp = fake_response([])
     @client.stub(:http_get, resp) do
       assert "#{@client.rating_for(@film)}"
+    end
+  end
+
+  def test_spanish_original_true_for_es_original_language
+    resp = fake_response([result(original_title: "El ser querido", vote_average: 6.5, original_language: "es")])
+
+    @client.stub(:http_get, resp) do
+      assert @client.spanish_original?(@film)
+    end
+  end
+
+  def test_spanish_original_false_for_other_original_language
+    resp = fake_response([result(original_title: "The Substance", vote_average: 7.2, original_language: "en")])
+
+    @client.stub(:http_get, resp) do
+      refute @client.spanish_original?(@film)
+    end
+  end
+
+  def test_spanish_original_false_when_no_search_results
+    resp = fake_response([])
+    @client.stub(:http_get, resp) do
+      refute @client.spanish_original?(@film)
     end
   end
 end
@@ -629,5 +653,69 @@ class WeeklyNotifierYelmoMergeTest < Minitest::Test
     # Film appears exactly once; time listed once (render_film deduplicates via .uniq)
     assert_match(/Harry Potter/, output)
     assert_equal 1, output.scan(/19:30/).length
+  end
+end
+
+# ---------------------------------------------------------------------------
+# WeeklyNotifier + Spanish-original VO fallback
+# ---------------------------------------------------------------------------
+
+class WeeklyNotifierSpanishOriginalTest < Minitest::Test
+  TODAY = Date.new(2024, 11, 15)
+
+  def setup
+    @cinemas = [{ "name" => "Yelmo Ocimax", "id" => "E0628", "url" => "http://example.com", "check_vo" => true }]
+  end
+
+  def stub_showtimes_for_dates(sessions_by_date)
+    showtimes = Minitest::Mock.new
+    7.times do |offset|
+      date = (TODAY + offset).to_s
+      showtimes.expect(:fetch_theater_movie_sessions, sessions_by_date[date] || [], date: date, theater_id: "E0628")
+    end
+    showtimes
+  end
+
+  def test_spanish_original_film_survives_vo_filter_without_vo_tag
+    film = Film.new(localized_title: "El ser querido", year: 2024)
+    film.title = "El ser querido"
+    # No provider ever tags a Spanish production as VOSE/local — but TMDB says
+    # its original_language is Spanish, so it IS the original version.
+    sessions_by_date = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "19:30", original_version?: false)] }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:spanish_original?, true, [film])
+    movies_db.expect(:fetch_original_title, film.title, [film])
+    movies_db.expect(:rating_for, Rating.null, [film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+                  .run(today: TODAY)
+
+    assert_match(/El ser querido/, output)
+    assert_match(/19:30/, output)
+  end
+
+  def test_non_spanish_dubbed_film_is_still_filtered_out
+    film = Film.new(localized_title: "Some Dubbed Film", year: 2024)
+    sessions_by_date = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "19:30", original_version?: false)] }
+    showtimes = stub_showtimes_for_dates(sessions_by_date)
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:spanish_original?, false, [film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    WeeklyNotifier.new(showtimes: showtimes, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+                  .run(today: TODAY)
+
+    refute_match(/Some Dubbed Film/, output)
+    assert_match(/no VO sessions/, output)
   end
 end
