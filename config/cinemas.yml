@@ -3,6 +3,7 @@ cinemas:
     id: "E0628"
     url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon"
     check_vo: true
+    yelmo_id: "asturias/ocimax-gijon"
 
   - name: "Ocine Premium Los Fresnos"
     id: "E2907"

@@ -15,6 +15,7 @@ require_relative "lib/film"
 require_relative "lib/screening_session"
 require_relative "lib/rating"
 require_relative "lib/sensacine_client"
+require_relative "lib/yelmo_client"
 require_relative "lib/tmdb_client"
 require_relative "lib/weekly_notifier"
 require_relative "lib/stdout_messenger"
@@ -306,6 +307,107 @@ class TmdbClientTest < Minitest::Test
 end
 
 # ---------------------------------------------------------------------------
+# YelmoClient
+# ---------------------------------------------------------------------------
+
+class YelmoClientTest < Minitest::Test
+  FakeResponse = Struct.new(:code, :body)
+
+  # 2024-11-15 00:00:00 UTC in milliseconds
+  DATE_MS = 1731628800000
+
+  def setup
+    @client = YelmoClient.new
+  end
+
+  def fake_response(cinemas)
+    FakeResponse.new("200", JSON.generate({ "d" => { "Cinemas" => cinemas } }))
+  end
+
+  def cinema_entry(key:, dates:)
+    { "Key" => key, "Dates" => dates }
+  end
+
+  def date_entry(ms:, movies:)
+    { "FilterDate" => "/Date(#{ms})/", "Movies" => movies }
+  end
+
+  def movie_entry(title:, formats:)
+    { "Title" => title, "Formats" => formats }
+  end
+
+  def format_entry(language:, showtimes:)
+    { "Language" => language, "Showtimes" => showtimes }
+  end
+
+  def showtime_entry(time:)
+    { "Time" => time }
+  end
+
+  def test_vose_session_is_original_version
+    resp = fake_response([
+      cinema_entry(key: "ocimax-gijon", dates: [
+        date_entry(ms: DATE_MS, movies: [
+          movie_entry(title: "Harry Potter", formats: [
+            format_entry(language: "VOSE", showtimes: [showtime_entry(time: "17:00")])
+          ])
+        ])
+      ])
+    ])
+
+    @client.stub(:http_post, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "asturias/ocimax-gijon")
+      assert_equal 1, sessions.length
+      assert sessions.first.original_version?
+      assert_match(/Harry Potter/, sessions.first.film.localized_title)
+      assert_equal "17:00", sessions.first.starts_at
+    end
+  end
+
+  def test_non_vose_session_is_not_original_version
+    resp = fake_response([
+      cinema_entry(key: "ocimax-gijon", dates: [
+        date_entry(ms: DATE_MS, movies: [
+          movie_entry(title: "El Rey León", formats: [
+            format_entry(language: "ES", showtimes: [showtime_entry(time: "12:00")])
+          ])
+        ])
+      ])
+    ])
+
+    @client.stub(:http_post, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "asturias/ocimax-gijon")
+      assert_equal 1, sessions.length
+      refute sessions.first.original_version?
+    end
+  end
+
+  def test_returns_empty_for_unknown_cinema_key
+    resp = fake_response([cinema_entry(key: "other-cinema", dates: [])])
+    @client.stub(:http_post, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "asturias/ocimax-gijon")
+      assert_empty sessions
+    end
+  end
+
+  def test_returns_empty_for_non_200_response
+    resp = FakeResponse.new("503", "")
+    @client.stub(:http_post, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "asturias/ocimax-gijon")
+      assert_empty sessions
+    end
+  end
+
+  def test_returns_empty_for_date_not_in_response
+    resp = fake_response([cinema_entry(key: "ocimax-gijon", dates: [])])
+    @client.stub(:http_post, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "asturias/ocimax-gijon")
+      assert_empty sessions
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------
 # WeeklyNotifier
 # ---------------------------------------------------------------------------
 
@@ -448,5 +550,84 @@ class WeeklyNotifierTest < Minitest::Test
     assert_match(/• Fri → 16:15, 18:15/, output, "Friday should show both sessions")
     assert_match(/• Sat → 16:15, 18:15/, output, "Saturday should show both sessions")
     assert_match(/• Sun → 16:15, 18:15/, output, "Sunday should show both sessions")
+  end
+end
+
+# ---------------------------------------------------------------------------
+# WeeklyNotifier + YelmoClient merge
+# ---------------------------------------------------------------------------
+
+class WeeklyNotifierYelmoMergeTest < Minitest::Test
+  TODAY = Date.new(2024, 11, 15)
+
+  def setup
+    @film = Film.new(localized_title: "Harry Potter", year: 2001)
+    @film.title = "Harry Potter and the Philosopher's Stone"
+    @cinemas = [{
+      "name"     => "Yelmo Ocimax",
+      "id"       => "E0628",
+      "url"      => "https://yelmocines.es/cartelera/asturias/ocimax-gijon",
+      "check_vo" => true,
+      "yelmo_id" => "asturias/ocimax-gijon"
+    }]
+  end
+
+  def stub_client_for_dates(sessions_by_date, theater_id)
+    client = Minitest::Mock.new
+    7.times do |offset|
+      date = (TODAY + offset).to_s
+      client.expect(:fetch_theater_movie_sessions, sessions_by_date[date] || [], date: date, theater_id: theater_id)
+    end
+    client
+  end
+
+  def test_yelmo_vo_makes_sensacine_dubbed_session_appear
+    film = @film
+    # SensaCine classifies the session as dubbed (check_vo would filter it out without Yelmo)
+    sc_sessions = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "17:00", original_version?: false)] }
+    # Yelmo correctly identifies it as VO
+    yelmo_sessions = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "17:00", original_version?: true)] }
+
+    showtimes = stub_client_for_dates(sc_sessions, "E0628")
+    yelmo     = stub_client_for_dates(yelmo_sessions, "asturias/ocimax-gijon")
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, film.title, [film])
+    movies_db.expect(:rating_for, Rating.null, [film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    WeeklyNotifier.new(showtimes: showtimes, yelmo_showtimes: yelmo, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+                  .run(today: TODAY)
+
+    assert_match(/Harry Potter/, output)
+    assert_match(/17:00/, output)
+  end
+
+  def test_yelmo_deduplicates_same_session_vo
+    film = @film
+    # Both sources list the same VO session
+    sc_sessions    = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "19:30", original_version?: true)] }
+    yelmo_sessions = { "2024-11-15" => [ScreeningSession.new(film: film, date: "2024-11-15", starts_at: "19:30", original_version?: true)] }
+
+    showtimes = stub_client_for_dates(sc_sessions, "E0628")
+    yelmo     = stub_client_for_dates(yelmo_sessions, "asturias/ocimax-gijon")
+
+    movies_db = Minitest::Mock.new
+    movies_db.expect(:fetch_original_title, film.title, [film])
+    movies_db.expect(:rating_for, Rating.null, [film])
+
+    output = ""
+    messenger = Minitest::Mock.new
+    messenger.expect(:send_message, nil) { |msg| output = msg }
+
+    WeeklyNotifier.new(showtimes: showtimes, yelmo_showtimes: yelmo, movies_db: movies_db, messenger: messenger, cinemas: @cinemas)
+                  .run(today: TODAY)
+
+    # Film appears exactly once; time listed once (render_film deduplicates via .uniq)
+    assert_match(/Harry Potter/, output)
+    assert_equal 1, output.scan(/19:30/).length
   end
 end
