@@ -153,6 +153,45 @@ class SensacineClientTest < Minitest::Test
     end
   end
 
+  def test_dubbed_with_diffusion_version_original_is_vo
+    resp = fake_response([entry(
+      title: "Harry Potter", year: 2001,
+      showtimes: { "dubbed" => [{ "startsAt" => "2024-11-15T17:00:00", "diffusionVersion" => "ORIGINAL" }] }
+    )])
+
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+      assert_equal 1, sessions.length
+      assert sessions.first.original_version?
+    end
+  end
+
+  def test_dubbed_without_diffusion_version_is_not_vo
+    resp = fake_response([entry(
+      title: "Harry Potter", year: 2001,
+      showtimes: { "dubbed" => [{ "startsAt" => "2024-11-15T17:00:00", "diffusionVersion" => nil }] }
+    )])
+
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+      assert_equal 1, sessions.length
+      refute sessions.first.original_version?
+    end
+  end
+
+  def test_original_st_bucket_is_vo
+    resp = fake_response([entry(
+      title: "Harry Potter", year: 2001,
+      showtimes: { "original_st" => [{ "startsAt" => "2024-11-15T19:30:00" }] }
+    )])
+
+    @client.stub(:http_get, resp) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+      assert_equal 1, sessions.length
+      assert sessions.first.original_version?
+    end
+  end
+
   def test_returns_empty_for_error_response
     resp = FakeResponse.new("503", "")
     @client.stub(:http_get, resp) do
