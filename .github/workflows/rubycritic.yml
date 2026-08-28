@@ -14,8 +14,8 @@ jobs:
         with:
           ruby-version: "3.3"
 
+      - name: Install RubyCritic
+        run: gem install rubycritic
+
       - name: Run RubyCritic
-        uses: f-mer/rubycritic-action@v1
-        with:
-          min_score: 1
-          path: lib
+        run: rubycritic --minimum-score 1 --no-browser lib
