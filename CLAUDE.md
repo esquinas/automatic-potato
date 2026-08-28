@@ -18,8 +18,10 @@ Each branch maps to exactly one PR. When master moves forward (merged PRs), alwa
 ## Commands
 
 ```bash
-ruby test.rb          # run all tests (minitest 5, inline Gemfile)
-ruby bin/run.rb       # run the notifier (requires env vars below)
+ruby test.rb              # run all tests (minitest 5, inline Gemfile)
+VERBOSE=1 ruby test.rb    # ...and let the clients' own logging through
+ruby bin/run.rb           # run the notifier (requires env vars below)
+ruby bin/diagnose.rb      # check the tokens and probe SensaCine live
 ```
 
 ## Secrets (GitHub Actions + local `.env`)
@@ -42,14 +44,25 @@ lib/
   film.rb               # mutable PORO: localized_title + year always set; title filled after TMDB lookup
   screening_session.rb  # Data.define: film, date, starts_at, original_version?
   rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
+  yelmo_client.rb       # authoritative VO source for Yelmo Ocimax Gijón
   weekly_notifier.rb    # orchestrator: collect → enrich → render → send
-bin/run.rb              # thin entry point: four plain .new calls
+bin/
+  run.rb                # thin entry point: four plain .new calls
+  diagnose.rb           # token health check + live SensaCine probe
+  capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
 config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, check_vo flag)
 .mise.toml              # Ruby version (3.3) pinned for mise
-test.rb                 # minitest 5 with inline Gemfile, stubbed HTTP
+test.rb                 # entry point: inline Gemfile, then loads test/
+test/
+  support/              # FakeHttp, fixtures loader, digest reader, fakes
+  fixtures/             # real captured provider payloads (see its README)
+  *_test.rb             # one file per class, plus end_to_end_test.rb
 .github/workflows/
   test.yml              # runs ruby test.rb on every push and PR
-  weekly.yml            # Monday 14:00 UTC cron + workflow_dispatch
+  rubycritic.yml        # code quality gate on lib/
+  weekly.yml            # Monday and Friday 14:00 UTC cron + workflow_dispatch
+  diagnose.yml          # workflow_dispatch token/API health check
+  capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
 ```
 
 ### Naming conventions
@@ -81,7 +94,31 @@ Response shape: `results[].movie.title`, `results[].showtimes.{original,dubbed,l
 
 The `check_vo` flag in `cinemas.yml` controls whether `WeeklyNotifier` applies the VO filter for a given venue (some venues screen only VO by policy, so no filter is needed).
 
-**Pagination:** the API returns all sessions for a given day in a single response — no `/p-{n}/` path segment is needed or supported (appending it causes the endpoint to return empty results).
+**Pagination:** a busy day is split into pages of ten, with `pagination.totalPages` saying how many. Extra pages are requested as `?page={n}`; the `/p-{n}/` *path* segment is not supported and makes the endpoint return empty results.
+
+**An empty day means expired, not absent.** The endpoint lists only screenings
+you could still buy a ticket for, so a day drains as its programme runs: by
+late evening every screening has gone and the response is `error: true`,
+`message: "next.showtime.on"`, `results: []`, with a `nextDate`. That is the
+API saying *the next showing is on X*, not *this day had no cinema*. How much
+of a day you see depends entirely on the hour you ask.
+
+Consequences, all of which are easy to get wrong:
+
+- **Never word output as "no sessions"** for a day or venue that came back
+  empty. The screenings existed; they have already been shown. Say that the
+  programme has passed, or that there is nothing left to book.
+- **Judge an empty result by the clock.** Empty for *today* late in the day is
+  normal. Empty for a *future* day cannot be expiry, so that is the signal
+  worth alarming on.
+- **`error: true` with a `nextDate` is a healthy answer.** Missing `nextDate`,
+  a non-200, or an unparseable body is not. Do not lump them together.
+- The Monday/Friday cron fires at 14:00 UTC — 16:00 in Gijón — so day-zero
+  screenings earlier than that are already gone from the feed and never reach
+  the digest. `test/fixtures/sensacine/nothing_left_that_day.json` was captured
+  at 01:26 local asking about the previous day, and records the behaviour.
+
+**Release year:** `SensacineClient` reads `movie.release.year`, which the current feed does not have — the production year lives at `movie.data.productionYear`, and the release dates under `movie.releases[]`. So `Film#year` is `nil` for every SensaCine film and TMDB is searched without its year filter. Nothing downstream breaks (the digest never prints the year), but matches are looser than intended. `test/sensacine_client_test.rb` records this.
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
 
@@ -93,6 +130,32 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 4. No cache: ~10 films/week is well within TMDB free tier (50 req/s).
 
 `TmdbClient` exposes three pure queries: `fetch_original_title(film)`, `rating_for(film)`, and `spanish_original?(film)` (`original_language == "es"` on the top search result). Mutation (`film.title =`) stays in `WeeklyNotifier`.
+
+## Tests
+
+`ruby test.rb` loads `test/support/` and then every `test/*_test.rb`. Two
+conventions hold throughout, and between them they are what lets the suite
+survive a refactor of the code it covers:
+
+1. **Only the network is faked.** `FakeHttp` intercepts `Net::HTTP.start` and
+   nothing else, so URL building, headers, the retry loop, JSON parsing and
+   bucket classification all run for real. No test names a method the project
+   owns. Real connections are blocked outright for the whole run, so a test
+   that forgets to stub fails instead of quietly reaching the internet.
+2. **Collaborators are small hand-written fakes**, never strict mocks with call
+   counts and argument order. A test fails when the digest is wrong, not when
+   the notifier asks TMDB in a different order. The fakes record what they were
+   asked, so a test that genuinely cares about call counts says so out loud.
+
+Assertions are about what the digest *says*, not how it is punctuated —
+`RenderedDigest` strips the markup and answers questions about films, times and
+venues. Expressiveness beats reuse: a test that repeats its setup in full and
+reads start to finish without scrolling to a helper is the one worth having.
+
+Fixtures under `test/fixtures/` are real captured payloads. Refresh them with
+the **Capture API fixtures** workflow, which prints live responses to the job
+log between `===== BEGIN fixture: … =====` markers; see
+`test/fixtures/README.md`.
 
 ## Design decisions
 

@@ -1,0 +1,27 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": "/1XAC6RPT01UX9EQGy2JVn5c8pgy.jpg",
+      "genre_ids": [
+        12,
+        14
+      ],
+      "id": 671,
+      "title": "Harry Potter y la piedra filosofal",
+      "original_language": "en",
+      "original_title": "Harry Potter and the Philosopher's Stone",
+      "overview": "Harry Potter es un huérfano que vive con sus desagradables tíos, los Dursley, y su repelente primo Dudley. Se acerca su …",
+      "popularity": 47.4173,
+      "poster_path": "/3MKK7vAJLtSkBTABMTjxf6TOCo3.jpg",
+      "release_date": "2001-11-16",
+      "softcore": false,
+      "video": false,
+      "vote_average": 7.903,
+      "vote_count": 30089
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 1
+}

@@ -1,0 +1,28 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": "/oG5kozJWLzevTrAPovtdnhCFo21.jpg",
+      "genre_ids": [
+        16,
+        35,
+        10751
+      ],
+      "id": 1187326,
+      "title": "Tadeo Jones y La Lámpara Maravillosa",
+      "original_language": "es",
+      "original_title": "Tadeo Jones y La Lámpara Maravillosa",
+      "overview": "Tadeo y Sara son ahora padres de Olimpia (Oli), una adorable e intrépida niña de dos años. Y Momia no lleva nada bien ha…",
+      "popularity": 7.8739,
+      "poster_path": "/71G1b8bqa7gzP9yU7q2fgNf2t0D.jpg",
+      "release_date": "2026-08-26",
+      "softcore": false,
+      "video": false,
+      "vote_average": 2.0,
+      "vote_count": 1
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 1
+}

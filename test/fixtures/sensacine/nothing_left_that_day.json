@@ -1,0 +1,85 @@
+{
+  "error": true,
+  "message": "next.showtime.on",
+  "messageParam": null,
+  "nextDate": "2026-08-28",
+  "results": [
+
+  ],
+  "params": {
+    "experience": null,
+    "projection": null,
+    "comfort": null,
+    "picture": null,
+    "sound": null,
+    "versionDetail": null,
+    "page": 1
+  },
+  "facets": [
+    {
+      "__typename": "Facets",
+      "name": "showtimes.projection",
+      "values": [
+        {
+          "key": "Digital",
+          "translation": {
+            "tag": "DIGITAL",
+            "name": "Digital"
+          }
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.experience",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.comfort",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.version_detail",
+      "values": [
+        {
+          "key": "Dubbed",
+          "versionDetail": "DUBBED"
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.picture",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.sound",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.service",
+      "values": [
+
+      ]
+    }
+  ],
+  "pagination": {
+    "page": "1",
+    "totalPages": 0,
+    "itemsPerPage": 10,
+    "totalItems": 0
+  },
+  "data": null
+}

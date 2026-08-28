@@ -14,6 +14,8 @@ ruby test.rb         # run tests
 ruby bin/run.rb      # run the notifier
 ```
 
+Tests are offline and take under a second: `FakeHttp` intercepts `Net::HTTP` and replays real provider responses captured under `test/fixtures/`. Refresh those with the **Capture API fixtures** GitHub Action, which prints live SensaCine, Yelmo and TMDB payloads to its job log.
+
 Configure secrets in `.mise.toml` — see the `[env]` section for required variables (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TMDB_API_KEY`). GitHub Actions reads them from repository secrets instead.
 
 ## Local Development

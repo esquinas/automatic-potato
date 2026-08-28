@@ -1,0 +1,686 @@
+{
+  "error": false,
+  "message": null,
+  "messageParam": null,
+  "nextDate": null,
+  "results": [
+    {
+      "movie": {
+        "__typename": "Movie",
+        "internalId": 44672,
+        "id": "TW92aWU6NDQ2NzI=",
+        "title": "Harry Potter y la Piedra Filosofal",
+        "originalTitle": "Harry Potter and the Philosopher's Stone",
+        "type": "FEATURE_FILM",
+        "runtime": "2h 32min",
+        "genres": [
+          {
+            "id": 13001,
+            "translate": "Aventura",
+            "tag": "ADVENTURE"
+          },
+          {
+            "id": 13012,
+            "translate": "Fantasía",
+            "tag": "FANTASY"
+          }
+        ],
+        "languages": [
+          "ENGLISH"
+        ],
+        "data": {
+          "__typename": "MovieData",
+          "seo": {
+            "__typename": "Seo",
+            "browsable": true,
+            "title": null
+          },
+          "productionYear": 2001,
+          "rules": {
+            "rating": {
+              "has_warning_message": false,
+              "has_mandatory_review": false
+            }
+          }
+        },
+        "releases": [
+          {
+            "__typename": "MovieRelease",
+            "releaseDate": {
+              "__typename": "PartialDate",
+              "date": "2001-11-30",
+              "precision": "day"
+            },
+            "name": "Released",
+            "certificate": {
+              "__typename": "Certificate",
+              "code": "APTA(i)",
+              "label": "Todos los publicos"
+            },
+            "advice": null,
+            "companyLimitation": null,
+            "releaseTags": {
+              "tagTypes": [
+                "THEATER"
+              ],
+              "tagFlags": null
+            },
+            "visaNumber": null
+          }
+        ],
+        "countries": [
+          {
+            "__typename": "Country",
+            "id": 5001,
+            "name": "United Kingdom",
+            "localizedName": "Reino Unido"
+          }
+        ],
+        "flags": {
+          "hasDvdRelease": false,
+          "hasNews": true,
+          "hasOnlineProduct": false,
+          "hasOnlineRelease": false,
+          "hasPhysicalProduct": false,
+          "hasPreview": false,
+          "hasShowtime": true,
+          "hasSoundtrack": false,
+          "hasTheaterRelease": true,
+          "hasTrivia": true,
+          "hasAwards": false,
+          "isLesIndes": false,
+          "isIncontestable": false,
+          "isClubApproved": [
+
+          ],
+          "hasClubNews": [
+
+          ],
+          "isComingSoon": false,
+          "isPlayingNow": true,
+          "tvRelease": false,
+          "hasTeaser": false,
+          "hasTrailer": true
+        },
+        "customFlags": {
+          "isPremiere": false,
+          "weeklyOuting": true
+        },
+        "synopsisFull": "<p class=\"bo-p\">Harry Potter, un niño huérfano, descubre en su undécimo cumpleaños que es hijo de dos destacados magos y…"
+      },
+      "showtimes": {
+        "local": [
+
+        ],
+        "local_st": [
+
+        ],
+        "local_sme": [
+
+        ],
+        "dubbed": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862940103,
+            "startsAt": "2026-08-29T22:45:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "DUBBED",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=G02A3&gid_entity=movie.movie._.44672&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34479"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "dubbed_st": [
+
+        ],
+        "dubbed_sme": [
+
+        ],
+        "original": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862940101,
+            "startsAt": "2026-08-29T17:00:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": null,
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=G02A3&gid_entity=movie.movie._.44672&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34477"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "original_st": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862940102,
+            "startsAt": "2026-08-29T20:30:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": null,
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=G02A3&gid_entity=movie.movie._.44672&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34478"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "original_sme": [
+
+        ]
+      }
+    },
+    {
+      "movie": {
+        "__typename": "Movie",
+        "internalId": 1000017442,
+        "id": "TW92aWU6MTAwMDAxNzQ0Mg==",
+        "title": "El ser querido",
+        "originalTitle": "El ser querido",
+        "type": "FEATURE_FILM",
+        "runtime": "1h 45min",
+        "genres": [
+          {
+            "id": 13008,
+            "translate": "Drama",
+            "tag": "DRAMA"
+          }
+        ],
+        "languages": [
+          "SPANISH"
+        ],
+        "data": {
+          "__typename": "MovieData",
+          "seo": {
+            "__typename": "Seo",
+            "browsable": true,
+            "title": null
+          },
+          "productionYear": 2026,
+          "rules": {
+            "rating": {
+              "has_warning_message": false,
+              "has_mandatory_review": false
+            }
+          }
+        },
+        "releases": [
+          {
+            "__typename": "MovieRelease",
+            "releaseDate": {
+              "__typename": "PartialDate",
+              "date": "2026-05-16",
+              "precision": "day"
+            },
+            "name": "Released",
+            "certificate": {
+              "__typename": "Certificate",
+              "code": "12",
+              "label": "Pelicula no recomendada a menores de 12"
+            },
+            "advice": null,
+            "companyLimitation": null,
+            "releaseTags": {
+              "tagTypes": [
+                "THEATER"
+              ],
+              "tagFlags": null
+            },
+            "visaNumber": null
+          }
+        ],
+        "countries": [
+          {
+            "__typename": "Country",
+            "id": 5017,
+            "name": "Spain",
+            "localizedName": "España"
+          }
+        ],
+        "flags": {
+          "hasDvdRelease": false,
+          "hasNews": true,
+          "hasOnlineProduct": false,
+          "hasOnlineRelease": false,
+          "hasPhysicalProduct": false,
+          "hasPreview": false,
+          "hasShowtime": true,
+          "hasSoundtrack": false,
+          "hasTheaterRelease": true,
+          "hasTrivia": true,
+          "hasAwards": false,
+          "isLesIndes": false,
+          "isIncontestable": false,
+          "isClubApproved": [
+
+          ],
+          "hasClubNews": [
+
+          ],
+          "isComingSoon": false,
+          "isPlayingNow": true,
+          "tvRelease": false,
+          "hasTeaser": false,
+          "hasTrailer": true
+        },
+        "customFlags": {
+          "isPremiere": false,
+          "weeklyOuting": true
+        },
+        "synopsisFull": "<p class=\"bo-p\">Un aclamado director de cine y su hija, una actriz sin éxito, ruedan juntos una película tras años de…"
+      },
+      "showtimes": {
+        "local": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862940201,
+            "startsAt": "2026-08-29T19:00:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": null,
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=G02A3&gid_entity=movie.movie._.1000017442&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34480"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "local_st": [
+
+        ],
+        "local_sme": [
+
+        ],
+        "dubbed": [
+
+        ],
+        "dubbed_st": [
+
+        ],
+        "dubbed_sme": [
+
+        ],
+        "original": [
+
+        ],
+        "original_st": [
+
+        ],
+        "original_sme": [
+
+        ]
+      }
+    },
+    {
+      "movie": {
+        "__typename": "Movie",
+        "internalId": 1000014969,
+        "id": "TW92aWU6MTAwMDAxNDk2OQ==",
+        "title": "La constelación del perro",
+        "originalTitle": "The Dog Stars",
+        "type": "FEATURE_FILM",
+        "runtime": "1h 59min",
+        "genres": [
+          {
+            "id": 13001,
+            "translate": "Aventura",
+            "tag": "ADVENTURE"
+          },
+          {
+            "id": 13023,
+            "translate": "Suspense",
+            "tag": "THRILLER"
+          },
+          {
+            "id": 13008,
+            "translate": "Drama",
+            "tag": "DRAMA"
+          }
+        ],
+        "languages": [
+          "ENGLISH"
+        ],
+        "data": {
+          "__typename": "MovieData",
+          "seo": {
+            "__typename": "Seo",
+            "browsable": true,
+            "title": null
+          },
+          "productionYear": 2026,
+          "rules": {
+            "rating": {
+              "has_warning_message": false,
+              "has_mandatory_review": false
+            }
+          }
+        },
+        "releases": [
+          {
+            "__typename": "MovieRelease",
+            "releaseDate": {
+              "__typename": "PartialDate",
+              "date": "2026-08-26",
+              "precision": "day"
+            },
+            "name": "Released",
+            "certificate": {
+              "__typename": "Certificate",
+              "code": "16",
+              "label": "Pelicula no recomendada a menores de 16"
+            },
+            "advice": null,
+            "companyLimitation": null,
+            "releaseTags": {
+              "tagTypes": [
+                "THEATER"
+              ],
+              "tagFlags": null
+            },
+            "visaNumber": null
+          }
+        ],
+        "countries": [
+          {
+            "__typename": "Country",
+            "id": 5002,
+            "name": "USA",
+            "localizedName": "EE.UU."
+          }
+        ],
+        "flags": {
+          "hasDvdRelease": false,
+          "hasNews": true,
+          "hasOnlineProduct": false,
+          "hasOnlineRelease": false,
+          "hasPhysicalProduct": false,
+          "hasPreview": false,
+          "hasShowtime": true,
+          "hasSoundtrack": false,
+          "hasTheaterRelease": true,
+          "hasTrivia": true,
+          "hasAwards": false,
+          "isLesIndes": false,
+          "isIncontestable": false,
+          "isClubApproved": [
+
+          ],
+          "hasClubNews": [
+
+          ],
+          "isComingSoon": false,
+          "isPlayingNow": true,
+          "tvRelease": false,
+          "hasTeaser": false,
+          "hasTrailer": true
+        },
+        "customFlags": {
+          "isPremiere": false,
+          "weeklyOuting": true
+        },
+        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…"
+      },
+      "showtimes": {
+        "local": [
+
+        ],
+        "local_st": [
+
+        ],
+        "local_sme": [
+
+        ],
+        "dubbed": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862940301,
+            "startsAt": "2026-08-29T21:15:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "ORIGINAL",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=G02A3&gid_entity=movie.movie._.1000014969&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34481"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "dubbed_st": [
+
+        ],
+        "dubbed_sme": [
+
+        ],
+        "original": [
+
+        ],
+        "original_st": [
+
+        ],
+        "original_sme": [
+
+        ]
+      }
+    }
+  ],
+  "params": {
+    "experience": null,
+    "projection": null,
+    "comfort": null,
+    "picture": null,
+    "sound": null,
+    "versionDetail": null,
+    "page": 1
+  },
+  "facets": [
+    {
+      "__typename": "Facets",
+      "name": "showtimes.projection",
+      "values": [
+        {
+          "key": "Digital",
+          "translation": {
+            "tag": "DIGITAL",
+            "name": "Digital"
+          }
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.experience",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.comfort",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.version_detail",
+      "values": [
+        {
+          "key": "Dubbed",
+          "versionDetail": "DUBBED"
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.picture",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.sound",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.service",
+      "values": [
+
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "totalPages": 1,
+    "itemsPerPage": 10,
+    "totalItems": 3
+  },
+  "data": null
+}

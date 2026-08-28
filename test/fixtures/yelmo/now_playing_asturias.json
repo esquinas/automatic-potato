@@ -1,0 +1,519 @@
+{
+  "d": {
+    "Cinemas": [
+      {
+        "Dates": [
+          {
+            "Movies": [
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34477,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33557",
+                        "TimeFilter": "/Date(1788040800000)/",
+                        "Time": "17:00",
+                        "ShowtimeAMPM": "05:00 PM",
+                        "Screen": 1,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34477,
+                    "MovieId": 0,
+                    "VistaId": "HO00001828",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "INGLÉS SUBTITULADO EN ESPAÑOL (VOSE)"
+                  },
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34476,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33556",
+                        "TimeFilter": "/Date(1788053400000)/",
+                        "Time": "20:30",
+                        "ShowtimeAMPM": "08:30 PM",
+                        "Screen": 1,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34476,
+                    "MovieId": 0,
+                    "VistaId": "HO00001828",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7219,
+                "Title": "Harry Potter y la Piedra Filosofal 25 Aniversario",
+                "Key": "harry-potter-y-la-piedra-filosofal-25-aniversario",
+                "OriginalTitle": "",
+                "Rating": "TP",
+                "RatingDescription": "Apta para todos los públicos.",
+                "RunTime": "168",
+                "Trailer": "",
+                "Distributor": "WARNER BROS ENTERTAIMENT ESPAÑA S.L",
+                "Gender": "",
+                "Director": "Chris Columbus",
+                "Actor": null,
+                "ProjectionType": "Eventos Especiales",
+                "Status": "Estreno",
+                "Order": 0
+              },
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34534,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33773",
+                        "TimeFilter": "/Date(1788040800000)/",
+                        "Time": "17:00",
+                        "ShowtimeAMPM": "05:00 PM",
+                        "Screen": 3,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34534,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33772",
+                        "TimeFilter": "/Date(1788050700000)/",
+                        "Time": "19:45",
+                        "ShowtimeAMPM": "07:45 PM",
+                        "Screen": 3,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34534,
+                    "MovieId": 0,
+                    "VistaId": "HO00001765",
+                    "Name": "SJ",
+                    "IsExperience": true,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  },
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33750",
+                        "TimeFilter": "/Date(1788038100000)/",
+                        "Time": "16:15",
+                        "ShowtimeAMPM": "04:15 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33749",
+                        "TimeFilter": "/Date(1788045600000)/",
+                        "Time": "18:20",
+                        "ShowtimeAMPM": "06:20 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33748",
+                        "TimeFilter": "/Date(1788053100000)/",
+                        "Time": "20:25",
+                        "ShowtimeAMPM": "08:25 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34488",
+                        "TimeFilter": "/Date(1788060600000)/",
+                        "Time": "22:30",
+                        "ShowtimeAMPM": "10:30 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34533,
+                    "MovieId": 0,
+                    "VistaId": "HO00001765",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7152,
+                "Title": "Tadeo Jones y la lámpara maravillosa",
+                "Key": "tadeo-jones-y-la-lampara-maravillosa",
+                "OriginalTitle": "",
+                "Rating": "TP",
+                "RatingDescription": "Apta para todos los públicos.",
+                "RunTime": "94",
+                "Trailer": "",
+                "Distributor": "PARAMOUNT SPAIN S.L",
+                "Gender": "",
+                "Director": "Enrique Gato",
+                "Actor": null,
+                "ProjectionType": "Movie",
+                "Status": "Estreno",
+                "Order": 0
+              },
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34503",
+                        "TimeFilter": "/Date(1788037200000)/",
+                        "Time": "16:00",
+                        "ShowtimeAMPM": "04:00 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34502",
+                        "TimeFilter": "/Date(1788045000000)/",
+                        "Time": "18:10",
+                        "ShowtimeAMPM": "06:10 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34499",
+                        "TimeFilter": "/Date(1788053400000)/",
+                        "Time": "20:30",
+                        "ShowtimeAMPM": "08:30 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34498",
+                        "TimeFilter": "/Date(1788061500000)/",
+                        "Time": "22:45",
+                        "ShowtimeAMPM": "10:45 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34764,
+                    "MovieId": 0,
+                    "VistaId": "HO00001838",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7231,
+                "Title": "Una noche al año",
+                "Key": "una-noche-al-ano",
+                "OriginalTitle": "",
+                "Rating": "M-16",
+                "RatingDescription": "No recomendada para menores de dieciséis años.",
+                "RunTime": "102",
+                "Trailer": "",
+                "Distributor": "UNIVERSAL PICTURES INTERNATIONAL SPAIN S.L",
+                "Gender": "",
+                "Director": "Will  Gluck",
+                "Actor": null,
+                "ProjectionType": "Movie",
+                "Status": "",
+                "Order": 0
+              }
+            ],
+            "FilterDate": "/Date(1787979600000)/",
+            "ShowtimeDate": "29 agosto"
+          },
+          {
+            "Movies": [
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34477,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33558",
+                        "TimeFilter": "/Date(1788127200000)/",
+                        "Time": "17:00",
+                        "ShowtimeAMPM": "05:00 PM",
+                        "Screen": 1,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34477,
+                    "MovieId": 0,
+                    "VistaId": "HO00001828",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "INGLÉS SUBTITULADO EN ESPAÑOL (VOSE)"
+                  },
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34476,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33559",
+                        "TimeFilter": "/Date(1788139800000)/",
+                        "Time": "20:30",
+                        "ShowtimeAMPM": "08:30 PM",
+                        "Screen": 1,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34476,
+                    "MovieId": 0,
+                    "VistaId": "HO00001828",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7219,
+                "Title": "Harry Potter y la Piedra Filosofal 25 Aniversario",
+                "Key": "harry-potter-y-la-piedra-filosofal-25-aniversario",
+                "OriginalTitle": "",
+                "Rating": "TP",
+                "RatingDescription": "Apta para todos los públicos.",
+                "RunTime": "168",
+                "Trailer": "",
+                "Distributor": "WARNER BROS ENTERTAIMENT ESPAÑA S.L",
+                "Gender": "",
+                "Director": "Chris Columbus",
+                "Actor": null,
+                "ProjectionType": "Eventos Especiales",
+                "Status": "Estreno",
+                "Order": 0
+              },
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34534,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33774",
+                        "TimeFilter": "/Date(1788127200000)/",
+                        "Time": "17:00",
+                        "ShowtimeAMPM": "05:00 PM",
+                        "Screen": 3,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34534,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34566",
+                        "TimeFilter": "/Date(1788137100000)/",
+                        "Time": "19:45",
+                        "ShowtimeAMPM": "07:45 PM",
+                        "Screen": 3,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34534,
+                    "MovieId": 0,
+                    "VistaId": "HO00001765",
+                    "Name": "SJ",
+                    "IsExperience": true,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  },
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33751",
+                        "TimeFilter": "/Date(1788124500000)/",
+                        "Time": "16:15",
+                        "ShowtimeAMPM": "04:15 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33752",
+                        "TimeFilter": "/Date(1788132000000)/",
+                        "Time": "18:20",
+                        "ShowtimeAMPM": "06:20 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "33753",
+                        "TimeFilter": "/Date(1788139500000)/",
+                        "Time": "20:25",
+                        "ShowtimeAMPM": "08:25 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34533,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34542",
+                        "TimeFilter": "/Date(1788147000000)/",
+                        "Time": "22:30",
+                        "ShowtimeAMPM": "10:30 PM",
+                        "Screen": 10,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34533,
+                    "MovieId": 0,
+                    "VistaId": "HO00001765",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7152,
+                "Title": "Tadeo Jones y la lámpara maravillosa",
+                "Key": "tadeo-jones-y-la-lampara-maravillosa",
+                "OriginalTitle": "",
+                "Rating": "TP",
+                "RatingDescription": "Apta para todos los públicos.",
+                "RunTime": "94",
+                "Trailer": "",
+                "Distributor": "PARAMOUNT SPAIN S.L",
+                "Gender": "",
+                "Director": "Enrique Gato",
+                "Actor": null,
+                "ProjectionType": "Movie",
+                "Status": "Estreno",
+                "Order": 0
+              },
+              {
+                "Formats": [
+                  {
+                    "Showtimes": [
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34552",
+                        "TimeFilter": "/Date(1788123600000)/",
+                        "Time": "16:00",
+                        "ShowtimeAMPM": "04:00 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34557",
+                        "TimeFilter": "/Date(1788131400000)/",
+                        "Time": "18:10",
+                        "ShowtimeAMPM": "06:10 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34562",
+                        "TimeFilter": "/Date(1788139800000)/",
+                        "Time": "20:30",
+                        "ShowtimeAMPM": "08:30 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      },
+                      {
+                        "RelationshipFormatMovieId": 34764,
+                        "CinemaId": 31,
+                        "VistaCinemaId": "785",
+                        "ShowtimeId": "34568",
+                        "TimeFilter": "/Date(1788147900000)/",
+                        "Time": "22:45",
+                        "ShowtimeAMPM": "10:45 PM",
+                        "Screen": 11,
+                        "IsSpecialDate": false
+                      }
+                    ],
+                    "RelationshipFormatMovieId": 34764,
+                    "MovieId": 0,
+                    "VistaId": "HO00001838",
+                    "Name": "2D",
+                    "IsExperience": false,
+                    "SegobPermission": null,
+                    "Language": "ESPAÑOL"
+                  }
+                ],
+                "Id": 7231,
+                "Title": "Una noche al año",
+                "Key": "una-noche-al-ano",
+                "OriginalTitle": "",
+                "Rating": "M-16",
+                "RatingDescription": "No recomendada para menores de dieciséis años.",
+                "RunTime": "102",
+                "Trailer": "",
+                "Distributor": "UNIVERSAL PICTURES INTERNATIONAL SPAIN S.L",
+                "Gender": "",
+                "Director": "Will  Gluck",
+                "Actor": null,
+                "ProjectionType": "Movie",
+                "Status": "",
+                "Order": 0
+              }
+            ],
+            "FilterDate": "/Date(1788066000000)/",
+            "ShowtimeDate": "30 agosto"
+          }
+        ],
+        "Id": 31,
+        "VistaId": "785",
+        "Key": "ocimax-gijon",
+        "Name": "Ocimax Gijón",
+        "IsPresale": false,
+        "Children": "",
+        "Status": "1",
+        "Order": 0,
+        "TimeZoneDifference": 7
+      }
+    ]
+  }
+}
