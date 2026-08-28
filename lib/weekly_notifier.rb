@@ -36,7 +36,8 @@ class WeeklyNotifier
     end
 
     message = lines.join("\n").strip
-    message = "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
+    len     = message.length
+    message = "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)" if len > TELEGRAM_MAX_MSG_CHARS
 
     @messenger.send_message(message)
     puts "Sent #{message.length} chars"
@@ -45,26 +46,26 @@ class WeeklyNotifier
   private
 
   def collect_sessions(cinema, today)
-    sensacine = WEEK_DAYS.times.flat_map do |offset|
-      date = (today + offset).to_s
-      @showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["id"])
-    end
+    sessions = sessions_for_week(@showtimes, cinema["id"], today)
 
     if @yelmo_showtimes && cinema["yelmo_id"]
-      yelmo = WEEK_DAYS.times.flat_map do |offset|
-        date = (today + offset).to_s
-        @yelmo_showtimes.fetch_theater_movie_sessions(date: date, theater_id: cinema["yelmo_id"])
-      end
-      sensacine = merge_sessions(sensacine, yelmo)
+      yelmo    = sessions_for_week(@yelmo_showtimes, cinema["yelmo_id"], today)
+      sessions = merge_sessions(sessions, yelmo)
     end
 
-    cinema["check_vo"] ? sensacine.select(&:original_version?) : sensacine
+    cinema["check_vo"] ? sessions.select(&:original_version?) : sessions
+  end
+
+  def sessions_for_week(client, theater_id, today)
+    WEEK_DAYS.times.flat_map do |offset|
+      client.fetch_theater_movie_sessions(date: (today + offset).to_s, theater_id: theater_id)
+    end
   end
 
   def merge_sessions(primary, secondary)
-    by_key = Hash.new { |h, k| h[k] = [] }
-    (primary + secondary).each do |s|
-      by_key[[s.date, s.starts_at, s.film.localized_title.downcase.strip]] << s
+    by_key = Hash.new { |hash, key| hash[key] = [] }
+    (primary + secondary).each do |session|
+      by_key[[session.date, session.starts_at, session.film.localized_title.downcase.strip]] << session
     end
     by_key.values.map { |group| group.find(&:original_version?) || group.first }
   end
@@ -76,7 +77,7 @@ class WeeklyNotifier
     unique_films.each { |film| film.title = @movies_db.fetch_original_title(film) }
 
     film_lines = unique_films.flat_map do |film|
-      render_film(film, @movies_db.rating_for(film), sessions.select { |s| s.film == film })
+      render_film(film, @movies_db.rating_for(film), sessions.select { |session| session.film == film })
     end
 
     [cinema_header(cinema, "#{cinema["name"]} — #{today} → #{week_end}"), *film_lines]
@@ -93,17 +94,16 @@ class WeeklyNotifier
       .transform_values { |ss| ss.map(&:starts_at).sort.uniq }
       .sort.to_h
 
+    all_times      = dates_map.values.flatten.sort.uniq
+    max_time_width = all_times.map(&:length).max
+
     showtime_lines = if dates_map.keys.length == WEEK_DAYS
-      all_times = dates_map.values.flatten.sort.uniq
-      max_time_width = all_times.map(&:length).max
-      formatted_times = all_times.map { |t| t.rjust(max_time_width) }
-      ["<pre>• All week: #{dates_map.keys.min} → #{dates_map.keys.max}\n  #{formatted_times.join(", ")}</pre>"]
+      formatted = all_times.map { |time| time.rjust(max_time_width) }
+      ["<pre>• All week: #{dates_map.keys.min} → #{dates_map.keys.max}\n  #{formatted.join(", ")}</pre>"]
     else
-      all_times = dates_map.values.flatten.sort.uniq
-      max_time_width = all_times.map(&:length).max
       lines = dates_map.map do |date, times|
-        formatted_times = times.map { |t| t.rjust(max_time_width) }
-        "• #{weekday(date)} → #{formatted_times.join(", ")}"
+        formatted = times.map { |time| time.rjust(max_time_width) }
+        "• #{weekday(date)} → #{formatted.join(", ")}"
       end
       ["<pre>#{lines.join("\n")}</pre>"]
     end
@@ -112,7 +112,8 @@ class WeeklyNotifier
   end
 
   def cinema_header(cinema, label)
-    cinema["url"] ? "<b><a href=\"#{cinema["url"]}\">#{label}</a></b>" : "<b>#{label}</b>"
+    url = cinema["url"]
+    url ? "<b><a href=\"#{url}\">#{label}</a></b>" : "<b>#{label}</b>"
   end
 
   def weekday(date_str)

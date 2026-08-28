@@ -43,34 +43,43 @@ class YelmoClient
     return {} unless resp.code == "200"
 
     cinemas = JSON.parse(resp.body).dig("d", "Cinemas") || []
-    cinema  = cinemas.find { |c| c["Key"] == cinema_key }
+    cinema  = cinemas.find { |entry| entry["Key"] == cinema_key }
     unless cinema
-      puts "  Yelmo: cinema #{cinema_key.inspect} not found (available: #{cinemas.map { |c| c["Key"] }.inspect})"
+      available = cinemas.map { |entry| entry["Key"] }
+      puts "  Yelmo: cinema #{cinema_key.inspect} not found (available: #{available.inspect})"
       return {}
     end
 
-    by_date = Hash.new { |h, k| h[k] = [] }
+    index_sessions(cinema)
+  end
+
+  def index_sessions(cinema)
+    by_date = Hash.new { |hash, key| hash[key] = [] }
     (cinema["Dates"] || []).each do |date_entry|
       date = parse_date(date_entry["FilterDate"])
       (date_entry["Movies"] || []).each do |movie|
-        film = Film.new(localized_title: movie["Title"] || "(untitled)", year: nil)
-        (movie["Formats"] || []).each do |format|
-          vo = VO_LANGUAGES.any? { |v| format["Language"].to_s.include?(v) }
-          (format["Showtimes"] || []).each do |showtime|
-            starts_at = showtime["Time"]&.slice(0, 5)
-            next unless starts_at
-
-            by_date[date] << ScreeningSession.new(
-              film:              film,
-              date:              date,
-              starts_at:         starts_at,
-              original_version?: vo
-            )
-          end
-        end
+        sessions_for_movie(movie, date).each { |session| by_date[date] << session }
       end
     end
     by_date
+  end
+
+  def sessions_for_movie(movie, date)
+    film = Film.new(localized_title: movie["Title"] || "(untitled)", year: nil)
+    (movie["Formats"] || []).flat_map do |format|
+      vo = VO_LANGUAGES.any? { |lang| format["Language"].to_s.include?(lang) }
+      (format["Showtimes"] || []).filter_map do |showtime|
+        starts_at = showtime["Time"]&.slice(0, 5)
+        next unless starts_at
+
+        ScreeningSession.new(
+          film:              film,
+          date:              date,
+          starts_at:         starts_at,
+          original_version?: vo
+        )
+      end
+    end
   end
 
   def parse_date(filter_date)

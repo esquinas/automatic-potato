@@ -16,21 +16,22 @@ class TmdbClient
   end
 
   def fetch_original_title(film)
-    search(film.localized_title, film.year)&.first&.dig("original_title")
+    search(film.localized_title, film.year).first&.dig("original_title")
   end
 
   def rating_for(film)
+    null    = Rating.null
     results = search(film.title || film.localized_title, film.year)
-    return Rating.null if results.nil? || results.empty?
+    return null if results.empty?
 
     top    = results[0]
     second = results[1]
 
-    return Rating.null if top["vote_count"].to_i.zero?
+    return null if top["vote_count"].to_i.zero?
 
     top_score    = top["vote_average"].to_f
     second_score = (second&.dig("vote_average") || 0).to_f
-    return Rating.null if second_score > 0 && top_score / second_score < AMBIGUITY_RATIO
+    return null if second_score > 0 && top_score / second_score < AMBIGUITY_RATIO
 
     Rating.new(score: top_score)
   end
@@ -41,7 +42,7 @@ class TmdbClient
     query = URI.encode_www_form(query: title, language: "es-ES", api_key: @api_key)
     query += "&year=#{year}" if year
     resp = http_get("#{DOMAIN}/3/search/movie?#{query}")
-    return nil unless resp.code == "200"
+    return [] unless resp.code == "200"
 
     JSON.parse(resp.body)["results"] || []
   end
