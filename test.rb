@@ -211,6 +211,24 @@ class SensacineClientTest < Minitest::Test
       assert_empty sessions
     end
   end
+
+  def test_fetches_multiple_pages_when_available
+    resp_page1 = FakeResponse.new("200", JSON.generate(
+      "results"    => [entry(title: "Film One", year: 2024, showtimes: { "original" => [{ "startsAt" => "2024-11-15T19:30:00" }] })],
+      "pagination" => { "totalPages" => 2 }
+    ))
+    resp_page2 = FakeResponse.new("200", JSON.generate(
+      "results"    => [entry(title: "Film Two", year: 2024, showtimes: { "original" => [{ "startsAt" => "2024-11-15T21:00:00" }] })],
+      "pagination" => { "totalPages" => 2 }
+    ))
+
+    responses  = [resp_page1, resp_page2]
+    call_count = 0
+    @client.stub(:http_get, ->(*) { responses[call_count].tap { call_count += 1 } }) do
+      sessions = @client.fetch_theater_movie_sessions(date: "2024-11-15", theater_id: "E0628")
+      assert_equal 2, sessions.length
+    end
+  end
 end
 
 # ---------------------------------------------------------------------------

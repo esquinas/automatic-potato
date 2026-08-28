@@ -35,7 +35,31 @@ class SensacineClient
       return []
     end
 
-    parse_sessions(parsed["results"] || [], date)
+    results      = parsed["results"] || []
+    total_pages  = parsed.dig("pagination", "totalPages").to_i
+    total_pages  = 1 if total_pages < 1
+
+    (2..total_pages).each do |page|
+      page_url = "#{url}?page=#{page}"
+      puts "GET #{page_url}"
+      page_resp = http_get(page_url, HEADERS)
+      puts "HTTP #{page_resp.code}"
+      unless page_resp.code == "200"
+        puts "  pagination: non-200 on page #{page}, stopping early"
+        break
+      end
+
+      page_parsed  = JSON.parse(page_resp.body)
+      page_results = page_parsed["results"] || []
+      if page_results.empty?
+        puts "  pagination: empty results on page #{page}, stopping early"
+        break
+      end
+
+      results += page_results
+    end
+
+    parse_sessions(results, date)
   end
 
   private
