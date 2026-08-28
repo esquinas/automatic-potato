@@ -1,0 +1,21 @@
+name: Code quality – RubyCritic
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rubycritic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install RubyCritic
+        run: gem install rubycritic
+
+      - name: Run RubyCritic
+        run: rubycritic --minimum-score 85 --format console --no-browser lib
