@@ -19,6 +19,10 @@ class TmdbClient
     search(film.localized_title, film.year)&.first&.dig("original_title")
   end
 
+  def spanish_original?(film)
+    search(film.localized_title, film.year)&.first&.dig("original_language") == "es"
+  end
+
   def rating_for(film)
     results = search(film.title || film.localized_title, film.year)
     return Rating.null if results.nil? || results.empty?
