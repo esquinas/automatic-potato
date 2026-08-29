@@ -1,7 +1,13 @@
 name: Tests
 
+# Scoped so a commit is checked once, not twice. A bare `push:` alongside
+# `pull_request:` means every push to a branch with an open PR fires both
+# events, and the same commit gets two identical runs. Limiting `push` to the
+# default branch leaves pull requests to the `pull_request` event and merges to
+# the `push` one.
 on:
   push:
+    branches: [master]
   pull_request:
 
 jobs:
