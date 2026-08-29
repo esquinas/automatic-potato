@@ -84,9 +84,22 @@ class WeeklyNotifier
   # Where two providers describe the same slot, the one that calls it original
   # version wins: SensaCine files Yelmo's subtitled screenings under "dubbed".
   def merge_sessions(primary, secondary)
+    lend_known_years(from: primary, to: secondary)
+
     (primary + secondary)
-      .group_by { |session| [session.date, session.starts_at, session.film.localized_title.downcase.strip] }
+      .group_by { |session| [session.date, session.starts_at, title_key(session.film)] }
       .values
       .map { |group| group.find(&:original_version?) || group.first }
   end
+
+  # Only SensaCine reports a year, and a Film is only the same film when the
+  # year matches too. Without this, Yelmo's copy of a film both providers list
+  # reaches the digest as a second, yearless film of the same name — printed
+  # twice, with the week's showtimes split between the two entries.
+  def lend_known_years(from:, to:)
+    years = from.map(&:film).to_h { |film| [title_key(film), film.year] }
+    to.map(&:film).each { |film| film.year ||= years[title_key(film)] }
+  end
+
+  def title_key(film) = film.localized_title.downcase.strip
 end

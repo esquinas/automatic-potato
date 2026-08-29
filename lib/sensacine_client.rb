@@ -64,11 +64,23 @@ class SensacineClient
 
   private
 
+  # The feed carries the film's own year under movie.data and the dates it
+  # reached cinemas under movie.releases[]. The production year is the one TMDB
+  # files a film under, so it is the one worth searching by; the earliest
+  # release is the fallback for an entry that arrives without one.
+  def year_of(entry)
+    entry.dig("movie", "data", "productionYear") || earliest_release_year(entry.dig("movie", "releases"))
+  end
+
+  def earliest_release_year(releases)
+    (releases || []).filter_map { |release| release.dig("releaseDate", "date").to_s[/\A\d{4}/] }.min&.to_i
+  end
+
   def parse_sessions(results, date)
     results.flat_map do |entry|
       film = Film.new(
         localized_title: entry.dig("movie", "title") || "(untitled)",
-        year:            entry.dig("movie", "release", "year")
+        year:            year_of(entry)
       )
 
       UNFILTERED_BUCKETS.flat_map do |bucket|

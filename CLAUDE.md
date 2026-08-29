@@ -129,7 +129,9 @@ Consequences, all of which are easy to get wrong:
 - `test/fixtures/sensacine/nothing_left_that_day.json` was captured at 01:26
   local asking about the previous day, and records the behaviour.
 
-**Release year:** `SensacineClient` reads `movie.release.year`, which the current feed does not have — the production year lives at `movie.data.productionYear`, and the release dates under `movie.releases[]`. So `Film#year` is `nil` for every SensaCine film and TMDB is searched without its year filter. Nothing downstream breaks (the digest never prints the year), but matches are looser than intended. `test/sensacine_client_test.rb` records this.
+**Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
+
+Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `WeeklyNotifier#lend_known_years` closes that at merge time by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
 

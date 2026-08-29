@@ -142,6 +142,19 @@ class EndToEndTest < ServiceTest
     assert_equal 1, ocimax.block_about("Tadeo Jones").lines.first.scan(/Tadeo Jones/i).length
   end
 
+  def test_a_film_is_looked_up_at_tmdb_under_the_year_it_was_made
+    # The point of reading the year off the SensaCine feed: TMDB answers a
+    # search for "Harry Potter y la Piedra Filosofal" with the film, its
+    # making-of and its re-releases, and 2001 is what tells them apart.
+    digest
+
+    searches = @http.requests_to("query=Harry+Potter+y+la+Piedra+Filosofal&").map(&:url)
+
+    refute_empty searches
+    assert searches.all? { |url| url.include?("year=2001") },
+           "TMDB was asked about Harry Potter without a year: #{searches.inspect}"
+  end
+
   def test_a_well_known_film_is_shown_with_its_tmdb_score
     assert_includes laboral.block_about("La constelación del perro"), "7.1"
   end
