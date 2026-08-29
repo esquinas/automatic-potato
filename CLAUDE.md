@@ -15,6 +15,8 @@ git push -u origin <branch-name>
 
 Each branch maps to exactly one PR. When master moves forward (merged PRs), always rebase or re-cut before opening a new PR so it has a single, clean commit on top of current master.
 
+**One exception:** a refactor that wins back the RubyCritic score the change cost, on the code that change touched or exposed, rides along on its branch as a commit of its own.
+
 ## Commands
 
 ```bash
