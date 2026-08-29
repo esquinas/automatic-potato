@@ -45,6 +45,8 @@ lib/
   screening_session.rb  # Data.define: film, date, starts_at, original_version?
   rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
   yelmo_client.rb       # authoritative VO source for Yelmo Ocimax Gijón
+  cinema_listing.rb     # Data.define: one cinema's week, enriched and ready to print
+  digest_renderer.rb    # pure: turns listings into the Telegram message
   weekly_notifier.rb    # orchestrator: collect → enrich → render → send
 bin/
   run.rb                # thin entry point: four plain .new calls
@@ -59,7 +61,7 @@ test/
   *_test.rb             # one file per class, plus end_to_end_test.rb
 .github/workflows/
   test.yml              # runs ruby test.rb on every push and PR
-  rubycritic.yml        # code quality gate on lib/
+  rubycritic.yml        # code quality gate on lib/ (minimum score 87)
   weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
@@ -167,6 +169,16 @@ log between `===== BEGIN fixture: … =====` markers; see
 `test/fixtures/README.md`.
 
 ## Design decisions
+
+**Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
+providers, decides which screenings survive, and enriches each film;
+`DigestRenderer` turns the result into text and asks nobody anything. The
+renderer is a pure function of its input, so the digest can be reasoned about
+without a single stub, and the notifier is free of every string of markup.
+`CinemaListing` is what passes between them: one venue's week, already
+enriched. The split took `lib/` from 85.97 to 88.54 on RubyCritic, and — the
+part worth noticing — the test suite needed no edit at all, because it asserts
+on what the digest says rather than on how it is assembled.
 
 **`Film` is a mutable PORO** — `title` starts `nil` and is filled after TMDB lookup. `Data.define` was rejected here because immutability would require propagating new instances across all `ScreeningSession` references that already hold the original `Film`.
 
