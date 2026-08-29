@@ -84,7 +84,7 @@ class WeeklyNotifierVoFilterTest < ServiceTest
                        messenger: outbox, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     refute outbox.digest.mentions?("La constelación del perro")
-    assert outbox.digest.mentions?("no VO sessions")
+    assert outbox.digest.mentions?("Nothing left to catch")
   end
 
   def test_tmdb_is_asked_about_a_film_once_however_often_it_screens

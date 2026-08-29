@@ -1,6 +1,6 @@
 # Gijón VO Cinema Weekly Notifier
 
-A Ruby script that queries SensaCine's internal JSON API weekly for non-dubbed screenings in Gijón, enriches results with TMDB ratings, and delivers a Telegram digest every Monday morning.
+A Ruby script that queries SensaCine's internal JSON API weekly for non-dubbed screenings in Gijón, enriches results with TMDB ratings, and delivers a Telegram digest on Monday and Friday mornings.
 
 ## Git workflow
 
@@ -60,7 +60,7 @@ test/
 .github/workflows/
   test.yml              # runs ruby test.rb on every push and PR
   rubycritic.yml        # code quality gate on lib/
-  weekly.yml            # Monday and Friday 14:00 UTC cron + workflow_dispatch
+  weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
 ```
@@ -115,10 +115,17 @@ Consequences, all of which are easy to get wrong:
   worth alarming on.
 - **`error: true` with a `nextDate` is a healthy answer.** Missing `nextDate`,
   a non-200, or an unparseable body is not. Do not lump them together.
-- The Monday/Friday cron fires at 14:00 UTC — 16:00 in Gijón — so day-zero
-  screenings earlier than that are already gone from the feed and never reach
-  the digest. `test/fixtures/sensacine/nothing_left_that_day.json` was captured
-  at 01:26 local asking about the previous day, and records the behaviour.
+- The cron fires at 11:00 in Gijón, ahead of the day's first screening (the
+  earliest seen at Ocimax is 16:00), so day zero reaches subscribers whole. It
+  used to fire at 16:00 local, which silently dropped every matinee. GitHub's
+  cron is UTC only and Gijón changes offset twice a year, so `weekly.yml` fires
+  at both 09:00 and 10:00 UTC and drops whichever one is not 11:00 locally.
+- The digest says so out loud rather than implying a complete day:
+  `WeeklyNotifier#closing_notes` ends every message with a line explaining that
+  today lists only what is still to come, and names a venue with nothing left
+  without claiming it programmed nothing.
+- `test/fixtures/sensacine/nothing_left_that_day.json` was captured at 01:26
+  local asking about the previous day, and records the behaviour.
 
 **Release year:** `SensacineClient` reads `movie.release.year`, which the current feed does not have — the production year lives at `movie.data.productionYear`, and the release dates under `movie.releases[]`. So `Film#year` is `nil` for every SensaCine film and TMDB is searched without its year filter. Nothing downstream breaks (the digest never prints the year), but matches are looser than intended. `test/sensacine_client_test.rb` records this.
 

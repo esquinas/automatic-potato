@@ -155,6 +155,35 @@ class WeeklyNotifierTest < ServiceTest
     assert_equal "Ciclo Buñuel: presentación", headline
   end
 
+  def test_the_digest_says_that_today_only_covers_what_is_still_to_come
+    # Neither provider lists a screening once it has started, so today's row is
+    # always the rest of today. Saying so is what stops a reader concluding
+    # that a film they can still catch tomorrow was not on at all.
+    substance = film("La sustancia", year: 2024)
+    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    outbox    = Outbox.new
+
+    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
+
+    assert outbox.digest.mentions?("still to come")
+  end
+
+  def test_a_venue_the_providers_had_nothing_left_for_is_not_said_to_have_had_nothing
+    # "no sessions" would be a claim neither provider ever makes: an empty
+    # answer means nothing is left to book, not that nothing was programmed.
+    substance = film("La sustancia", year: 2024)
+    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")],
+                             "E0628" => [])
+    outbox    = Outbox.new
+
+    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+                       messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
+
+    assert outbox.digest.mentions?("Nothing left to catch this week at: Yelmo Cines Ocimax Gijón")
+    refute_match(/\bno\b.{0,20}\bsessions\b/i, outbox.digest.text)
+  end
+
   def test_a_venue_with_nothing_on_is_named_once_instead_of_given_a_section
     substance = film("La sustancia", year: 2024)
     listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")],
@@ -165,7 +194,7 @@ class WeeklyNotifierTest < ServiceTest
                        messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("Yelmo Cines Ocimax Gijón")
-    assert outbox.digest.mentions?("no VO sessions")
+    assert outbox.digest.mentions?("Nothing left to catch")
     refute outbox.digest.mentions?("Yelmo Cines Ocimax Gijón — 2026-08-31")
   end
 

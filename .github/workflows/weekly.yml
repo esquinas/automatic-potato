@@ -1,21 +1,47 @@
 name: Weekly VO Cinema Notifier
 
+# The digest goes out at 11:00 in Gijón, well before the first screenings of
+# the day (the earliest seen at Ocimax is 16:00), so day zero still reaches
+# subscribers whole.
+#
+# GitHub's cron is UTC only and Gijón moves between CET (UTC+1) and CEST
+# (UTC+2), so 11:00 local is 10:00 UTC in winter and 09:00 UTC in summer.
+# Both fire and the guard below drops whichever one is wrong today. It is
+# written to fail towards sending: an unreadable clock sends twice rather than
+# not at all, because a duplicate digest is obvious and a missing one is not.
+
 on:
   schedule:
-    - cron: '0 14 * * 1,5'  # Mondays and Fridays 14:00 UTC
+    - cron: '0 9 * * 1,5'   # 11:00 Gijón while CEST is in force
+    - cron: '0 10 * * 1,5'  # 11:00 Gijón while CET is in force
   workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - id: clock
+        name: Is it 11:00 in Gijón?
+        run: |
+          hour=$(TZ=Europe/Madrid date +%H || echo "")
+          echo "Gijón local time: ${hour:-unknown}:00"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ -n "$hour" ] && [ "$hour" != "11" ]; then
+            echo "send=false" >> "$GITHUB_OUTPUT"
+            echo "Not 11:00 in Gijón — this is the daylight-saving twin. Skipping."
+          else
+            echo "send=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v5
+        if: steps.clock.outputs.send == 'true'
 
       - uses: ruby/setup-ruby@v1
+        if: steps.clock.outputs.send == 'true'
         with:
           ruby-version: "3.3"
 
       - name: Send notification
+        if: steps.clock.outputs.send == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

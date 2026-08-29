@@ -148,7 +148,7 @@ class EndToEndTest < ServiceTest
 
   def test_a_venue_with_nothing_on_is_named_at_the_end
     assert digest.mentions?("Teatro Jovellanos")
-    assert digest.mentions?("no VO sessions")
+    assert digest.mentions?("Nothing left to catch")
   end
 
   def test_each_venue_is_headed_with_the_week_it_covers_and_a_link_to_its_page
