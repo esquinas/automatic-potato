@@ -90,7 +90,9 @@ Headers required: `Referer: https://www.sensacine.com/cines/cine/`, realistic `U
 
 Response shape: `results[].movie.title`, `results[].showtimes.{original,dubbed,local}[].startsAt`.
 
-**VO filter:** use the bucket key, not `diffusionVersion` — live data shows dubbed films have `diffusionVersion=nil` and originals have `"ORIGINAL"`, making the field unreliable. `original` and `local` buckets = VO; `dubbed` = excluded.
+**VO filter — both signals count.** A screening is original version if its bucket is one of `VO_BUCKETS` (`original`, `original_st`, `original_sme`, `local`, `local_st`, `local_sme`) **or** its `diffusionVersion` is `"ORIGINAL"`. The bucket alone is not enough: SensaCine misfiles some subtitled prints under `dubbed`, where only `diffusionVersion` gives them away — that is how Yelmo's VOSE screenings arrive, and it is what `test_a_screening_misfiled_as_dubbed_is_rescued_by_its_diffusion_version` pins down.
+
+`diffusionVersion` is not enough on its own either, and its vocabulary has moved: it was observed as `nil` on dubbed screenings when the filter was first written, and the 2026-08-28 capture shows `"DUBBED"`. Treat a new value there as a change worth looking at rather than as noise.
 
 The `check_vo` flag in `cinemas.yml` controls whether `WeeklyNotifier` applies the VO filter for a given venue (some venues screen only VO by policy, so no filter is needed).
 

@@ -63,10 +63,6 @@ class RenderedDigest
     RenderedDigest.new(lines.join)
   end
 
-  def mentions_anywhere?(subject)
-    blocks.any? { |block| block.include?(subject) }
-  end
-
   # Every clock time listed under a film, in the order it is printed.
   def times_listed_for(film_title)
     block_about(film_title).scan(/\b\d{1,2}:\d{2}\b/)

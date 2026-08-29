@@ -183,21 +183,21 @@ class SensacineClientTest < ServiceTest
     assert_equal 2, @http.requests.length
   end
 
-  def test_the_release_year_is_no_longer_where_the_client_looks_for_it
-    # Worth knowing about, and deliberately recorded rather than quietly fixed:
-    # SensaCine keeps the production year at movie.data.productionYear, while
-    # the client reads movie.release.year. So Film#year is nil for every
-    # SensaCine film, and TMDB gets searched without its year filter — matches
-    # are looser than they were designed to be. Nothing downstream breaks: the
-    # digest never prints the year.
+  def test_the_feed_keeps_the_production_year_where_the_client_does_not_look
+    # SensaCine puts the production year under movie.data, and the release
+    # dates under movie.releases[]. There is no movie.release.year, which is
+    # what SensacineClient reads — so Film#year is nil for every SensaCine film
+    # and TMDB gets searched without its year filter. Matches are looser than
+    # they were designed to be; nothing downstream breaks, because the digest
+    # never prints the year. Recorded in CLAUDE.md, to be fixed on its own.
+    #
+    # What is asserted here is the feed's shape, not the consequence: if
+    # SensaCine ever moves the field back, this goes red and says so, and
+    # whoever fixes the client is not left explaining a failure they caused.
     entry = Fixtures.parse("sensacine/ocimax_all_dubbed.json")["results"].first
 
     assert_equal 2026, entry.dig("movie", "data", "productionYear")
     assert_nil entry.dig("movie", "release", "year")
-
-    @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
-
-    assert_nil sessions_for(date: "2026-08-28", theater_id: "E0628").first.film.year
   end
 
   private

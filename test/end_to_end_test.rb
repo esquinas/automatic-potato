@@ -110,7 +110,7 @@ class EndToEndTest < ServiceTest
 
   def test_a_foreign_film_dubbed_into_spanish_does_not
     # Una noche al año is One Night Only with a Spanish soundtrack.
-    refute digest.mentions_anywhere?("Una noche al año")
+    refute digest.mentions?("Una noche al año")
   end
 
   def test_the_original_bucket_at_the_laboral_reaches_the_digest
@@ -166,11 +166,17 @@ class EndToEndTest < ServiceTest
     assert_equal 1, @http.requests_to("yelmocines.es").length, "one city, cached for the week"
   end
 
-  def test_this_is_the_digest_a_subscriber_receives
-    # Printed rather than asserted line by line: an exact-match assertion here
-    # would break on every deliberate wording change, while the tests above
-    # already pin down everything the message has to say. This one exists so
-    # that a reader can see the shape of the thing.
+  def test_the_whole_week_fits_in_one_telegram_message
+    # Deliberately not an exact-match assertion on the text: that would break
+    # on every intentional wording change, and the tests above already pin down
+    # everything the message has to say. What is left worth guarding is that a
+    # digest comes out at all and that Telegram will accept it — it rejects
+    # anything over 4096 characters outright.
+    #
+    # VERBOSE=1 ruby test.rb prints the digest, for anyone who wants to see the
+    # shape of the thing rather than read assertions about it.
+    puts "\n#{digest.text}\n" if ENV["VERBOSE"]
+
     refute_empty digest.raw
     assert_operator digest.raw.length, :<, 4096
   end

@@ -131,14 +131,24 @@ class FakeHttp
     response
   end
 
+  # Whatever Net::HTTP.start was before this fake took over is kept here, not
+  # under a shared alias: two fakes nested inside one another would otherwise
+  # save each other's stand-in and the outer unwind would leave the fake
+  # installed, silently retiring the real-connection guard for the rest of the
+  # run. Re-entering on the same fake still has nowhere to put the second
+  # original, so that says so instead of quietly losing one.
   def install
+    raise "This FakeHttp is already intercepting" if @start_before_faking
+
     connection = self
-    Net::HTTP.singleton_class.send(:alias_method, :__start_before_faking, :start)
+    @start_before_faking = Net::HTTP.method(:start)
     Net::HTTP.define_singleton_method(:start) { |*, **, &block| block.call(connection) }
   end
 
   def uninstall
-    Net::HTTP.singleton_class.send(:alias_method, :start, :__start_before_faking)
-    Net::HTTP.singleton_class.send(:remove_method, :__start_before_faking)
+    return unless @start_before_faking
+
+    Net::HTTP.define_singleton_method(:start, @start_before_faking)
+    @start_before_faking = nil
   end
 end
