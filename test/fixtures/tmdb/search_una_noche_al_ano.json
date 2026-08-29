@@ -1,0 +1,27 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": "/mfgNUnFB25BNIwe9iPJ17cUN64S.jpg",
+      "genre_ids": [
+        35,
+        10749
+      ],
+      "id": 1433367,
+      "title": "Una noche al año",
+      "original_language": "en",
+      "original_title": "One Night Only",
+      "overview": "Dos extraños tratan de encontrar a alguien con quien acostarse en la única noche del año en la que es legal el sexo prem…",
+      "popularity": 25.295,
+      "poster_path": "/6zWaYWrPXG7JBX3Tb3OI9ITWGad.jpg",
+      "release_date": "2026-07-28",
+      "softcore": false,
+      "video": false,
+      "vote_average": 6.8,
+      "vote_count": 42
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 1
+}

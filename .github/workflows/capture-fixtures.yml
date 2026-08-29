@@ -1,0 +1,33 @@
+name: Capture API fixtures
+
+# Prints real SensaCine / Yelmo / TMDB payloads to the job log. The fixtures
+# under test/fixtures/ are copied straight out of this output, so run this
+# whenever a provider changes shape and the fixtures need refreshing.
+#
+# Manual dispatch only: a full capture makes around sixty live requests. Narrow
+# it with the provider input to keep the log short enough to read end to end.
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Which provider to capture"
+        type: choice
+        default: all
+        options: [all, sensacine, yelmo, tmdb]
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Print live API payloads
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          PROVIDER: ${{ inputs.provider }}
+        run: ruby bin/capture_fixtures.rb

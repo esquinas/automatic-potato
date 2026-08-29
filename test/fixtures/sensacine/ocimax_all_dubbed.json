@@ -1,0 +1,524 @@
+{
+  "error": false,
+  "message": null,
+  "messageParam": null,
+  "nextDate": null,
+  "results": [
+    {
+      "movie": {
+        "__typename": "Movie",
+        "internalId": 1000014969,
+        "id": "TW92aWU6MTAwMDAxNDk2OQ==",
+        "title": "La constelación del perro",
+        "originalTitle": "The Dog Stars",
+        "type": "FEATURE_FILM",
+        "runtime": "1h 59min",
+        "genres": [
+          {
+            "id": 13001,
+            "translate": "Aventura",
+            "tag": "ADVENTURE"
+          },
+          {
+            "id": 13023,
+            "translate": "Suspense",
+            "tag": "THRILLER"
+          },
+          {
+            "id": 13008,
+            "translate": "Drama",
+            "tag": "DRAMA"
+          }
+        ],
+        "languages": [
+          "ENGLISH"
+        ],
+        "data": {
+          "__typename": "MovieData",
+          "seo": {
+            "__typename": "Seo",
+            "browsable": true,
+            "title": null
+          },
+          "productionYear": 2026,
+          "rules": {
+            "rating": {
+              "has_warning_message": false,
+              "has_mandatory_review": false
+            }
+          }
+        },
+        "releases": [
+          {
+            "__typename": "MovieRelease",
+            "releaseDate": {
+              "__typename": "PartialDate",
+              "date": "2026-08-26",
+              "precision": "day"
+            },
+            "name": "Released",
+            "certificate": {
+              "__typename": "Certificate",
+              "code": "16",
+              "label": "Pelicula no recomendada a menores de 16"
+            },
+            "advice": null,
+            "companyLimitation": null,
+            "releaseTags": {
+              "tagTypes": [
+                "THEATER"
+              ],
+              "tagFlags": null
+            },
+            "visaNumber": null
+          }
+        ],
+        "countries": [
+          {
+            "__typename": "Country",
+            "id": 5002,
+            "name": "USA",
+            "localizedName": "EE.UU."
+          }
+        ],
+        "flags": {
+          "hasDvdRelease": false,
+          "hasNews": true,
+          "hasOnlineProduct": false,
+          "hasOnlineRelease": false,
+          "hasPhysicalProduct": false,
+          "hasPreview": false,
+          "hasShowtime": true,
+          "hasSoundtrack": false,
+          "hasTheaterRelease": true,
+          "hasTrivia": true,
+          "hasAwards": false,
+          "isLesIndes": false,
+          "isIncontestable": false,
+          "isClubApproved": [
+
+          ],
+          "hasClubNews": [
+
+          ],
+          "isComingSoon": false,
+          "isPlayingNow": true,
+          "tvRelease": false,
+          "hasTeaser": false,
+          "hasTrailer": true
+        },
+        "customFlags": {
+          "isPremiere": false,
+          "weeklyOuting": true
+        },
+        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…"
+      },
+      "showtimes": {
+        "local": [
+
+        ],
+        "local_st": [
+
+        ],
+        "local_sme": [
+
+        ],
+        "dubbed": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862939395,
+            "startsAt": "2026-08-28T18:45:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "DUBBED",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=E0628&gid_entity=movie.movie._.1000014969&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34472"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          },
+          {
+            "__typename": "Showtime",
+            "internalId": 80862939396,
+            "startsAt": "2026-08-28T21:15:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "DUBBED",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=E0628&gid_entity=movie.movie._.1000014969&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34473"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "dubbed_st": [
+
+        ],
+        "dubbed_sme": [
+
+        ],
+        "original": [
+
+        ],
+        "original_st": [
+
+        ],
+        "original_sme": [
+
+        ]
+      }
+    },
+    {
+      "movie": {
+        "__typename": "Movie",
+        "internalId": 257425,
+        "id": "TW92aWU6MjU3NDI1",
+        "title": "Tadeo Jones y la lámpara maravillosa",
+        "originalTitle": "Tadeo Jones y la lámpara maravillosa",
+        "type": "FEATURE_FILM",
+        "runtime": "1h 34min",
+        "genres": [
+          {
+            "id": 13001,
+            "translate": "Aventura",
+            "tag": "ADVENTURE"
+          },
+          {
+            "id": 13036,
+            "translate": "Familia",
+            "tag": "FAMILY"
+          },
+          {
+            "id": 13005,
+            "translate": "Comedia",
+            "tag": "COMEDY"
+          }
+        ],
+        "languages": [
+          "SPANISH"
+        ],
+        "data": {
+          "__typename": "MovieData",
+          "seo": {
+            "__typename": "Seo",
+            "browsable": true,
+            "title": null
+          },
+          "productionYear": 2026,
+          "rules": {
+            "rating": {
+              "has_warning_message": false,
+              "has_mandatory_review": false
+            }
+          }
+        },
+        "releases": [
+          {
+            "__typename": "MovieRelease",
+            "releaseDate": {
+              "__typename": "PartialDate",
+              "date": "2026-08-26",
+              "precision": "day"
+            },
+            "name": "Released",
+            "certificate": {
+              "__typename": "Certificate",
+              "code": "APTA(i)",
+              "label": "Todos los publicos"
+            },
+            "advice": null,
+            "companyLimitation": null,
+            "releaseTags": {
+              "tagTypes": [
+                "THEATER"
+              ],
+              "tagFlags": null
+            },
+            "visaNumber": null
+          }
+        ],
+        "countries": [
+          {
+            "__typename": "Country",
+            "id": 5017,
+            "name": "Spain",
+            "localizedName": "España"
+          }
+        ],
+        "flags": {
+          "hasDvdRelease": false,
+          "hasNews": true,
+          "hasOnlineProduct": false,
+          "hasOnlineRelease": false,
+          "hasPhysicalProduct": false,
+          "hasPreview": false,
+          "hasShowtime": true,
+          "hasSoundtrack": false,
+          "hasTheaterRelease": true,
+          "hasTrivia": true,
+          "hasAwards": false,
+          "isLesIndes": false,
+          "isIncontestable": false,
+          "isClubApproved": [
+
+          ],
+          "hasClubNews": [
+
+          ],
+          "isComingSoon": false,
+          "isPlayingNow": true,
+          "tvRelease": false,
+          "hasTeaser": false,
+          "hasTrailer": true
+        },
+        "customFlags": {
+          "isPremiere": false,
+          "weeklyOuting": true
+        },
+        "synopsisFull": "<p class=\"bo-p\">Tadeo y Sara disfrutan ahora de la vida como padres de Olimpia (Oli), una niña de dos años llena de curi…"
+      },
+      "showtimes": {
+        "local": [
+
+        ],
+        "local_st": [
+
+        ],
+        "local_sme": [
+
+        ],
+        "dubbed": [
+          {
+            "__typename": "Showtime",
+            "internalId": 80862939542,
+            "startsAt": "2026-08-28T16:15:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "DUBBED",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=E0628&gid_entity=movie.movie._.257425&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34450"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          },
+          {
+            "__typename": "Showtime",
+            "internalId": 80862939543,
+            "startsAt": "2026-08-28T22:30:00",
+            "timeBeforeStart": "PT0H0M0S",
+            "service": null,
+            "experience": null,
+            "comfort": null,
+            "projection": [
+              "DIGITAL"
+            ],
+            "picture": null,
+            "sound": null,
+            "tags": [
+              "Format.Projection.Digital"
+            ],
+            "diffusionVersion": "DUBBED",
+            "data": {
+              "__typename": "ShowtimeData",
+              "ticketing": [
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://relay.mvtx.us/ticketing/dbz?code_theater=E0628&gid_entity=movie.movie._.257425&tags=Format.Projection.Digital"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "relay"
+                },
+                {
+                  "__typename": "Ticketing",
+                  "urls": [
+                    "https://compra.yelmocines.es/?cinemaVistaId=785&showtimeVistaId=34451"
+                  ],
+                  "type": "DESKTOP",
+                  "provider": "default"
+                }
+              ]
+            },
+            "isPreview": false,
+            "isWeeklyMovieOuting": true
+          }
+        ],
+        "dubbed_st": [
+
+        ],
+        "dubbed_sme": [
+
+        ],
+        "original": [
+
+        ],
+        "original_st": [
+
+        ],
+        "original_sme": [
+
+        ]
+      }
+    }
+  ],
+  "params": {
+    "experience": null,
+    "projection": null,
+    "comfort": null,
+    "picture": null,
+    "sound": null,
+    "versionDetail": null,
+    "page": 1
+  },
+  "facets": [
+    {
+      "__typename": "Facets",
+      "name": "showtimes.projection",
+      "values": [
+        {
+          "key": "Digital",
+          "translation": {
+            "tag": "DIGITAL",
+            "name": "Digital"
+          }
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.experience",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.comfort",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.version_detail",
+      "values": [
+        {
+          "key": "Dubbed",
+          "versionDetail": "DUBBED"
+        }
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.picture",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.sound",
+      "values": [
+
+      ]
+    },
+    {
+      "__typename": "Facets",
+      "name": "showtimes.service",
+      "values": [
+
+      ]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "totalPages": 1,
+    "itemsPerPage": 10,
+    "totalItems": 2
+  },
+  "data": null
+}

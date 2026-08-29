@@ -1,0 +1,27 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": "/bVSOgrxasVJF6V71T7v2KfBRSzu.jpg",
+      "genre_ids": [
+        27,
+        878
+      ],
+      "id": 933260,
+      "title": "La sustancia",
+      "original_language": "en",
+      "original_title": "The Substance",
+      "overview": "'Tú, pero mejor en todos los sentidos'. Esa es la promesa de la sustancia, un producto revolucionario basado en la divis…",
+      "popularity": 29.4325,
+      "poster_path": "/4cJyrYA7I29QabrQ0S89N1iWUV2.jpg",
+      "release_date": "2024-09-07",
+      "softcore": false,
+      "video": false,
+      "vote_average": 7.131,
+      "vote_count": 6375
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 1
+}

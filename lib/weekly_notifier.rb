@@ -15,14 +15,14 @@ class WeeklyNotifier
   end
 
   def run(today: Date.today)
-    lines         = []
-    no_vo_cinemas = []
+    lines           = []
+    nothing_left_at = []
 
     @cinemas.each do |cinema|
       sessions = collect_sessions(cinema, today)
 
       if sessions.empty?
-        no_vo_cinemas << cinema["name"]
+        nothing_left_at << cinema["name"]
         next
       end
 
@@ -30,10 +30,7 @@ class WeeklyNotifier
       lines << ""
     end
 
-    unless no_vo_cinemas.empty?
-      lines << "The following venues had no VO sessions: #{no_vo_cinemas.join(", ")}"
-      lines << ""
-    end
+    lines.concat(closing_notes(nothing_left_at))
 
     message = lines.join("\n").strip
     message = "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)" if message.length > TELEGRAM_MAX_MSG_CHARS
@@ -43,6 +40,19 @@ class WeeklyNotifier
   end
 
   private
+
+  # Both providers list only screenings you could still buy a ticket for, so a
+  # day drains as its programme runs and a venue that came back empty has not
+  # necessarily programmed nothing — its screenings may already have been
+  # shown. Neither line below claims otherwise, and neither should anything
+  # that replaces them: see "An empty day means expired, not absent" in
+  # CLAUDE.md.
+  def closing_notes(nothing_left_at)
+    notes = []
+    notes += ["Nothing left to catch this week at: #{nothing_left_at.join(", ")}", ""] unless nothing_left_at.empty?
+    notes << "Today lists only what is still to come; earlier screenings have already been shown."
+    notes
+  end
 
   def collect_sessions(cinema, today)
     sensacine = WEEK_DAYS.times.flat_map do |offset|
