@@ -13,29 +13,29 @@ class WeeklyNotifier
   WEEK_DAYS = 7
 
   def initialize(showtimes:, movies_db:, messenger:, cinemas:, yelmo_showtimes: nil)
-    @showtimes       = showtimes
-    @movies_db       = movies_db
-    @messenger       = messenger
-    @cinemas         = cinemas
-    @yelmo_showtimes = yelmo_showtimes
+    @showtimes              = showtimes
+    @movies_db              = movies_db
+    @messenger              = messenger
+    @cinemas                = cinemas
+    @yelmo_showtimes        = yelmo_showtimes
+    @spanish_original_cache = {}
   end
 
   def run(today: Date.today)
-    listings        = []
-    nothing_left_at = []
+    programmes            = @cinemas.map { |cinema| [cinema, collect_sessions(cinema, today)] }
+    showing, nothing_left = programmes.partition { |_cinema, sessions| sessions.any? }
+    listings              = showing.map { |cinema, sessions| listing_for(cinema, sessions) }
+    nothing_left_at       = nothing_left.map { |cinema, _sessions| cinema["name"] }
 
-    @cinemas.each do |cinema|
-      sessions = collect_sessions(cinema, today)
-      sessions.empty? ? nothing_left_at << cinema["name"] : listings << listing_for(cinema, sessions)
-    end
-
-    message = DigestRenderer.new(today: today, week_days: WEEK_DAYS).render(listings, nothing_left_at)
-
-    @messenger.send_message(message)
-    puts "Sent #{message.length} chars"
+    deliver(DigestRenderer.new(today: today, week_days: WEEK_DAYS).render(listings, nothing_left_at))
   end
 
   private
+
+  def deliver(message)
+    @messenger.send_message(message)
+    puts "Sent #{message.length} chars"
+  end
 
   # The providers only know a film by its Spanish release title. Filling in the
   # original title and the rating happens here, before anything is rendered,
@@ -77,7 +77,6 @@ class WeeklyNotifier
   # only screening IS the original version. TMDB's original_language is the only
   # way to tell that apart from a foreign film dubbed into Spanish.
   def spanish_original?(film)
-    @spanish_original_cache ||= {}
     @spanish_original_cache.fetch(film) { @spanish_original_cache[film] = @movies_db.spanish_original?(film) }
   end
 
@@ -87,7 +86,7 @@ class WeeklyNotifier
     lend_known_years(from: primary, to: secondary)
 
     (primary + secondary)
-      .group_by { |session| [session.date, session.starts_at, title_key(session.film)] }
+      .group_by(&:slot)
       .values
       .map { |group| group.find(&:original_version?) || group.first }
   end
@@ -97,9 +96,9 @@ class WeeklyNotifier
   # reaches the digest as a second, yearless film of the same name — printed
   # twice, with the week's showtimes split between the two entries.
   def lend_known_years(from:, to:)
-    years = from.map(&:film).to_h { |film| [title_key(film), film.year] }
-    to.map(&:film).each { |film| film.year ||= years[title_key(film)] }
+    years = known_years(from)
+    to.map(&:film).each { |film| film.year ||= years[film.key] }
   end
 
-  def title_key(film) = film.localized_title.downcase.strip
+  def known_years(sessions) = sessions.map(&:film).to_h { |film| [film.key, film.year] }
 end

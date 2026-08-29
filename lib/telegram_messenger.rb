@@ -4,6 +4,7 @@ require "net/http"
 require "json"
 require "uri"
 
+# Delivers the digest to the Telegram channel subscribers read.
 class TelegramMessenger
   DOMAIN = "https://api.telegram.org"
 
@@ -14,9 +15,15 @@ class TelegramMessenger
 
   def send_message(text)
     uri = URI("#{DOMAIN}/bot#{@token}/sendMessage")
-    req = Net::HTTP::Post.new(uri)
-    req.content_type = "application/json"
-    req.body = JSON.generate(chat_id: @chat_id, text: text, parse_mode: "HTML")
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |h| h.request(req) }
+    Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |connection| connection.request(post_to(uri, text)) }
+  end
+
+  private
+
+  def post_to(uri, text)
+    request              = Net::HTTP::Post.new(uri)
+    request.content_type = "application/json"
+    request.body         = JSON.generate(chat_id: @chat_id, text: text, parse_mode: "HTML")
+    request
   end
 end
