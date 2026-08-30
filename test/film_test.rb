@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../lib/film"
-require_relative "../lib/rating"
 
 # A Film is the one deliberately mutable object in the domain. The cinema
 # providers only know a film by its Spanish release title; its original title

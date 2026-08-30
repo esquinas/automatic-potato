@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "date"
-require_relative "../lib/weekly_notifier"
 
 # Which screenings survive to reach a subscriber.
 #
@@ -14,26 +13,26 @@ class WeeklyNotifierVoFilterTest < ServiceTest
 
   MONDAY = Date.new(2026, 8, 31)
 
-  COMMERCIAL_CINEMA = {
-    "name" => "Ocine Premium Los Fresnos", "id" => "E2907",
-    "url" => "https://www.ocinepremiumlosfresnos.es/", "check_vo" => true
-  }.freeze
+  COMMERCIAL_CINEMA = Cinema.new(
+    name: "Ocine Premium Los Fresnos", sensacine_id: "E2907", yelmo_id: nil,
+    url: "https://www.ocinepremiumlosfresnos.es/", check_vo: true
+  )
 
-  # No check_vo key at all: everything this venue screens is worth listing.
-  ORIGINAL_VERSION_ONLY_VENUE = {
-    "name" => "Centro de Cultura Antiguo Instituto", "id" => "G02E9",
-    "url" => "https://www.gijon.es/es/directorio/centro-de-cultura-antiguo-instituto"
-  }.freeze
+  # check_vo left off: everything this venue screens is worth listing.
+  ORIGINAL_VERSION_ONLY_VENUE = Cinema.new(
+    name: "Centro de Cultura Antiguo Instituto", sensacine_id: "G02E9", yelmo_id: nil,
+    url: "https://www.gijon.es/es/directorio/centro-de-cultura-antiguo-instituto", check_vo: false
+  )
 
   def test_at_a_cinema_that_dubs_only_the_original_version_screenings_are_listed
     dog_stars = film("La constelación del perro", year: 2026)
-    listings  = Listings.new("E2907" => [
+    listings  = Listings.new("Ocine Premium Los Fresnos" => [
       screening(dog_stars, on: "2026-09-04", at: "18:45", original_version: false),
       screening(dog_stars, on: "2026-09-04", at: "21:15", original_version: true)
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     assert_equal ["21:15"], outbox.digest.times_listed_for("La constelación del perro")
@@ -44,12 +43,12 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     # screenings as "dubbed" is simply wrong about them, and filtering on that
     # would empty the section.
     obscure  = film("Ciclo Buñuel: presentación")
-    listings = Listings.new("G02E9" => [
+    listings = Listings.new("Centro de Cultura Antiguo Instituto" => [
       screening(obscure, on: "2026-09-04", at: "20:00", original_version: false)
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [ORIGINAL_VERSION_ONLY_VENUE]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("Ciclo Buñuel: presentación")
@@ -61,13 +60,13 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     # is the original. TMDB's original_language is the only way to tell that
     # apart from a foreign film dubbed into Spanish.
     querido  = film("El ser querido", year: 2026)
-    listings = Listings.new("E2907" => [
+    listings = Listings.new("Ocine Premium Los Fresnos" => [
       screening(querido, on: "2026-09-04", at: "19:00", original_version: false)
     ])
     tmdb   = MovieDatabase.new(spanish_productions: ["El ser querido"])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
                        messenger: outbox, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     assert_equal ["19:00"], outbox.digest.times_listed_for("El ser querido")
@@ -75,12 +74,12 @@ class WeeklyNotifierVoFilterTest < ServiceTest
 
   def test_a_foreign_film_dubbed_into_spanish_is_still_dropped
     dog_stars = film("La constelación del perro", year: 2026)
-    listings  = Listings.new("E2907" => [
+    listings  = Listings.new("Ocine Premium Los Fresnos" => [
       screening(dog_stars, on: "2026-09-04", at: "18:45", original_version: false)
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     refute outbox.digest.mentions?("La constelación del perro")
@@ -98,7 +97,7 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     end
     tmdb = MovieDatabase.new(spanish_productions: ["El ser querido"])
 
-    WeeklyNotifier.new(showtimes: Listings.new("E2907" => all_week), movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [Listings.new("Ocine Premium Los Fresnos" => all_week)], movies_db: tmdb,
                        messenger: Outbox.new, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     assert_equal 1, tmdb.times_asked(:spanish_original?, "El ser querido")
@@ -111,7 +110,7 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     ])
     tmdb = MovieDatabase.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
                        messenger: Outbox.new, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
     assert_equal 0, tmdb.times_asked(:spanish_original?, "La constelación del perro")

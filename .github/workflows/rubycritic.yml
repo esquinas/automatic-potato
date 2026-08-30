@@ -28,4 +28,4 @@ jobs:
       # enough to catch real decay, loose enough that an ordinary addition does
       # not turn CI red and train the next person to lower the number.
       - name: Run RubyCritic
-        run: rubycritic --minimum-score 89 --format console --no-browser lib
+        run: rubycritic --minimum-score 91 --format console --no-browser lib

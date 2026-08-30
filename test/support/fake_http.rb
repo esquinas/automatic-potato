@@ -8,16 +8,16 @@ require "uri"
 #
 # Everything above that line runs for real — URL building, headers, the retry
 # loop, JSON parsing, bucket classification, session mapping. That is what
-# makes the suite survive refactoring: rename +http_get+, turn +HttpClient+
-# into a base class, move pagination into its own object, and these tests
-# still pass, because none of them names a method the project owns.
+# makes the suite survive refactoring: rename the fetch method, move the
+# retry loop into its own object, re-namespace the lot, and these tests still
+# pass, because none of them names a method the project owns.
 #
 #   http = FakeHttp.new
 #   http.answers "showtimes/theater-E0628/d-2026-08-28",
 #                body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 #
 #   sessions = http.while_intercepting do
-#     SensacineClient.new.fetch_theater_movie_sessions(date: "2026-08-28", theater_id: "E0628")
+#     Showtimes::Sensacine.new.sessions_for(ocimax, "2026-08-28")
 #   end
 #
 #   http.requests.first.url      # exactly what went on the wire

@@ -2,11 +2,6 @@
 
 require "date"
 require "uri"
-require_relative "../lib/sensacine_client"
-require_relative "../lib/yelmo_client"
-require_relative "../lib/tmdb_client"
-require_relative "../lib/telegram_messenger"
-require_relative "../lib/weekly_notifier"
 
 # The whole service, wired exactly as bin/run.rb wires it, run against the
 # payloads the real providers sent back on 28 August 2026. Nothing is faked
@@ -23,13 +18,14 @@ class EndToEndTest < ServiceTest
   FRIDAY = Date.new(2026, 8, 28)
 
   CINEMAS = [
-    { "name" => "Yelmo Cines Ocimax Gijón", "id" => "E0628",
-      "url" => "https://yelmocines.es/cartelera/asturias/ocimax-gijon",
-      "check_vo" => true, "yelmo_id" => "asturias/ocimax-gijon" },
-    { "name" => "Teatro de la Laboral (Laboral Cinemateca)", "id" => "G02A3",
-      "url" => "https://www.laboralcinemateca.es/en/venta-de-entradas", "check_vo" => true },
-    { "name" => "Teatro Jovellanos", "id" => "G02E8",
-      "url" => "https://teatrojovellanos.janto.es/" }
+    VoCinema::Cinema.new(name: "Yelmo Cines Ocimax Gijón", sensacine_id: "E0628",
+                         yelmo_id: "asturias/ocimax-gijon", check_vo: true,
+                         url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon"),
+    VoCinema::Cinema.new(name: "Teatro de la Laboral (Laboral Cinemateca)", sensacine_id: "G02A3",
+                         yelmo_id: nil, check_vo: true,
+                         url: "https://www.laboralcinemateca.es/en/venta-de-entradas"),
+    VoCinema::Cinema.new(name: "Teatro Jovellanos", sensacine_id: "G02E8", yelmo_id: nil,
+                         check_vo: false, url: "https://teatrojovellanos.janto.es/")
   ].freeze
 
   def setup
@@ -63,11 +59,10 @@ class EndToEndTest < ServiceTest
     @digest ||= begin
       @http.while_intercepting do
         WeeklyNotifier.new(
-          showtimes:       SensacineClient.new,
-          yelmo_showtimes: YelmoClient.new,
-          movies_db:       TmdbClient.new(api_key: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"),
-          messenger:       TelegramMessenger.new(token: "7842115903:AAH2-fake", chat_id: "-1001234567890"),
-          cinemas:         CINEMAS
+          showtimes: [Showtimes::Sensacine.new, Showtimes::Yelmo.new],
+          movies_db: Movies::Tmdb.new(api_key: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"),
+          messenger: Messengers::Telegram.new(token: "7842115903:AAH2-fake", chat_id: "-1001234567890"),
+          cinemas:   CINEMAS
         ).run(today: FRIDAY)
       end
       RenderedDigest.new(JSON.parse(delivery.body)["text"])

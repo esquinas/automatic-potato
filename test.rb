@@ -23,14 +23,10 @@
 # and can be read start to finish without scrolling to a shared helper, is the
 # one worth having.
 
-require "bundler/inline"
-
-gemfile(true) do
-  source "https://rubygems.org"
-  gem "minitest", "~> 5"
-end
-
+require "bundler/setup"
 require "minitest/autorun"
+
+require_relative "lib/vo_cinema"
 
 require_relative "test/support/no_real_sleeping"
 require_relative "test/support/fixtures"
@@ -41,4 +37,7 @@ require_relative "test/support/fakes"
 
 FakeHttp.block_real_connections
 
-Dir[File.join(__dir__, "test", "*_test.rb")].sort.each { |test_file| require test_file }
+Dir[File.join(__dir__, "test", "**", "*_test.rb")]
+  .reject { |path| path.include?("/support/") }
+  .sort
+  .each { |test_file| require test_file }

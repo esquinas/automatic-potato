@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../lib/rating"
 
 # Rating is a null object. Callers push it into a list of message parts and
 # join them; a film TMDB could not rate contributes nothing rather than

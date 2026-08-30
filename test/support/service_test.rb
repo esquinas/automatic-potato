@@ -12,6 +12,11 @@ require "stringio"
 # This hooks before_setup/after_teardown rather than setup/teardown so that
 # subclasses can define setup without having to remember to call super.
 class ServiceTest < Minitest::Test
+  # Tests name the domain the way the code does — Film, Showtimes::Sensacine —
+  # rather than repeating the top-level namespace on every line, exactly as
+  # application code inside VoCinema does.
+  include VoCinema
+
   def before_setup
     super
     RecordedSleeps.reset

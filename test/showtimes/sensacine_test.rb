@@ -1,28 +1,29 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/sensacine_client"
 
-# SensacineClient turns one theatre-day of SensaCine's internal JSON into
+# Showtimes::Sensacine turns one theatre-day of SensaCine's internal JSON into
 # ScreeningSessions. It answers with every screening it finds, original version
 # or not, and marks each one; deciding what to do with a dubbed screening is
 # the notifier's job, not the client's.
-class SensacineClientTest < ServiceTest
+class SensacineTest < ServiceTest
+  include Screenings
+
   def setup
     @http   = FakeHttp.new
-    @client = SensacineClient.new
+    @client = Showtimes::Sensacine.new(http: Http::Client.new(headers: Showtimes::Sensacine::HEADERS))
   end
 
-  def sessions_for(date:, theater_id:)
+  def sessions_on(date, theater_id: "E0628")
     @http.while_intercepting do
-      @client.fetch_theater_movie_sessions(date: date, theater_id: theater_id)
+      @client.sessions_for(cinema("A cinema", sensacine_id: theater_id), date)
     end
   end
 
   def test_it_asks_for_one_theatre_on_one_day
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 
-    sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_equal 1, @http.requests.length
     assert_equal "GET", @http.requests.first.verb
@@ -35,7 +36,7 @@ class SensacineClientTest < ServiceTest
     # like its own site being browsed, so these headers are load-bearing.
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 
-    sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions_on("2026-08-28", theater_id: "E0628")
     headers = @http.requests.first.headers
 
     assert_equal "application/json", headers["accept"]
@@ -48,7 +49,7 @@ class SensacineClientTest < ServiceTest
     # Two films at Yelmo Ocimax, two screenings each.
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_equal 4, sessions.length
   end
@@ -56,7 +57,7 @@ class SensacineClientTest < ServiceTest
   def test_a_session_knows_its_film_its_day_and_the_time_it_starts
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
     dog_stars = sessions.select { |session| session.film.localized_title == "La constelación del perro" }
 
     assert_equal ["18:45", "21:15"], dog_stars.map(&:starts_at).sort
@@ -66,7 +67,7 @@ class SensacineClientTest < ServiceTest
   def test_a_dubbed_screening_is_not_an_original_version_screening
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/ocimax_all_dubbed.json")
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     refute sessions.any?(&:original_version?),
            "Every screening in this day sits in the dubbed bucket"
@@ -127,7 +128,7 @@ class SensacineClientTest < ServiceTest
     # asking about the previous day, when all of it was hours in the past.
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/nothing_left_that_day.json")
 
-    sessions = sessions_for(date: "2026-08-27", theater_id: "E0628")
+    sessions = sessions_on("2026-08-27", theater_id: "E0628")
 
     assert_empty sessions
   end
@@ -138,7 +139,7 @@ class SensacineClientTest < ServiceTest
     # Logging it is what tells the two apart when a week looks quiet.
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/nothing_left_that_day.json")
 
-    sessions_for(date: "2026-08-27", theater_id: "E0628")
+    sessions_on("2026-08-27", theater_id: "E0628")
 
     assert_includes printed_output, "2026-08-28"
   end
@@ -146,7 +147,7 @@ class SensacineClientTest < ServiceTest
   def test_a_provider_that_will_not_answer_costs_us_the_day_and_nothing_more
     @http.answers "sensacine.com", status: "503"
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_empty sessions
   end
@@ -157,7 +158,7 @@ class SensacineClientTest < ServiceTest
     feed["results"][0]["showtimes"]["dubbed"][0]["startsAt"] = nil
     @http.answers "sensacine.com", body: JSON.generate(feed)
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_equal 3, sessions.length
   end
@@ -166,7 +167,7 @@ class SensacineClientTest < ServiceTest
     @http.answers "d-2026-08-28/?page=2", body: Fixtures.read("sensacine/ocimax_page_2_of_2.json")
     @http.answers "d-2026-08-28/",        body: Fixtures.read("sensacine/ocimax_page_1_of_2.json")
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_equal ["La constelación del perro", "Tadeo Jones y la lámpara maravillosa"],
                  sessions.map { |session| session.film.localized_title }.uniq.sort
@@ -177,7 +178,7 @@ class SensacineClientTest < ServiceTest
     @http.answers "d-2026-08-28/?page=2", body: JSON.generate(empty_page_two)
     @http.answers "d-2026-08-28/",        body: Fixtures.read("sensacine/ocimax_page_1_of_2.json")
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
 
     assert_equal 1, sessions.length
     assert_equal 2, @http.requests.length
@@ -202,7 +203,7 @@ class SensacineClientTest < ServiceTest
     feed["results"][0]["movie"]["data"].delete("productionYear")
     @http.answers "sensacine.com", body: JSON.generate(feed)
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
     dog_stars = find_session(sessions, "La constelación del perro", "18:45")
 
     assert_equal 2026, dog_stars.film.year
@@ -216,7 +217,7 @@ class SensacineClientTest < ServiceTest
     feed["results"][0]["movie"]["releases"] = []
     @http.answers "sensacine.com", body: JSON.generate(feed)
 
-    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    sessions = sessions_on("2026-08-28", theater_id: "E0628")
     dog_stars = find_session(sessions, "La constelación del perro", "18:45")
 
     assert_nil dog_stars.film.year
@@ -226,7 +227,7 @@ class SensacineClientTest < ServiceTest
 
   def laboral_sessions
     @http.answers "sensacine.com", body: Fixtures.read("sensacine/laboral_original_version.json")
-    sessions_for(date: "2026-08-29", theater_id: "G02A3")
+    sessions_on("2026-08-29", theater_id: "G02A3")
   end
 
   def find_session(sessions, title, starts_at)

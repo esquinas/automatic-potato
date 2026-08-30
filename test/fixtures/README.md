@@ -18,7 +18,7 @@ Captured 2026-08-28 from `GET /_/showtimes/theater-{id}/d-{date}/`.
 
 | File | What it shows |
 | --- | --- |
-| `ocimax_all_dubbed.json` | A normal day at Yelmo Ocimax. Every screening sits in the `dubbed` bucket — the situation that made `YelmoClient` necessary. |
+| `ocimax_all_dubbed.json` | A normal day at Yelmo Ocimax. Every screening sits in the `dubbed` bucket — the situation that made `Showtimes::Yelmo` necessary. |
 | `laboral_original_version.json` | The `original`, `original_st` and `local` buckets, plus a subtitled screening misfiled under `dubbed` and betrayed only by `diffusionVersion`. |
 | `ocimax_page_1_of_2.json`, `ocimax_page_2_of_2.json` | A day SensaCine splits across two pages. Derived from `ocimax_all_dubbed.json` — the capture workflow does not print these two. |
 | `nothing_left_that_day.json` | How the API says a day's screenings have already run: `error: true`, the message `next.showtime.on`, and a `nextDate`. Captured at 01:26 Madrid time asking about the previous day. It does **not** mean that day had no cinema — see the note below. |

@@ -37,34 +37,45 @@ Each class reads its own secrets from ENV as default keyword arguments — plain
 ## Architecture
 
 ```
+Gemfile                 # zeitwerk (runtime), minitest (test)
 lib/
-  http_client.rb        # shared HTTP module (one retry, jitter) — included by clients
-  sensacine_client.rb   # fetches showtimes from SensaCine internal JSON API
-  tmdb_client.rb        # searches TMDB for original title + rating
-  telegram_messenger.rb # sends message via Telegram Bot API
-  stdout_messenger.rb   # sends message to stdout (dev/testing)
-  film.rb               # mutable PORO: localized_title + year always set; title filled after TMDB lookup
-  screening_session.rb  # Data.define: film, date, starts_at, original_version?; #slot identifies a screening across providers
-  rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
-  yelmo_client.rb       # authoritative VO source for Yelmo Ocimax Gijón
-  cinema_listing.rb     # Data.define: one cinema's week, enriched and ready to print
-  digest_renderer.rb    # pure: turns listings into the Telegram message
-  timetable.rb          # pure: one film's week, grouped by day and aligned into a column
-  weekly_notifier.rb    # orchestrator: collect → enrich → render → send
+  vo_cinema.rb          # sets up Zeitwerk; the only require_relative in the project
+  vo_cinema/
+    cinema.rb           # Data.define: one venue as config/cinemas.yml describes it
+    film.rb             # mutable PORO: localized_title + year always set; title filled after TMDB
+    rating.rb           # Data.define with .null sentinel; to_s/to_str safe for interpolation
+    screening_session.rb# Data.define: film, date, starts_at, original_version?; #slot identifies a screening
+    cinema_listing.rb   # Data.define: one cinema's week, enriched and ready to print
+    weekly_notifier.rb  # orchestrator: collect → enrich → render → send
+    http/
+      client.rb         # the only code that touches the network: retry, pacing, shared headers
+    showtimes/
+      sensacine.rb      # fetches a theatre-day, follows pagination
+      sensacine/day.rb  # reads one day's payload into ScreeningSessions
+      yelmo.rb          # fetches a city once, caches it
+      yelmo/listing.rb  # reads one cinema's payload into ScreeningSessions by day
+    movies/
+      tmdb.rb           # original title, rating, and whether a film is a Spanish production
+    digest/
+      renderer.rb       # pure: turns listings into the Telegram message
+      timetable.rb      # pure: one film's week, grouped by day and aligned into a column
+    messengers/
+      telegram.rb       # posts the digest; owns Telegram's length limit
+      stdout.rb         # prints the digest; strips the markup a terminal cannot use
 bin/
-  run.rb                # thin entry point: four plain .new calls
+  run.rb                # thin entry point
   diagnose.rb           # token health check + live SensaCine probe
   capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
-config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, check_vo flag)
+config/cinemas.yml      # user-editable cinema list (name, provider ids, url, check_vo flag)
 .mise.toml              # Ruby version (3.3) pinned for mise
-test.rb                 # entry point: inline Gemfile, then loads test/
+test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
 test/
   support/              # FakeHttp, fixtures loader, digest reader, fakes
   fixtures/             # real captured provider payloads (see its README)
-  *_test.rb             # one file per class, plus end_to_end_test.rb
+  **/*_test.rb          # mirrors lib/, plus end_to_end_test.rb
 .github/workflows/
-  test.yml              # runs ruby test.rb on every push and PR
-  rubycritic.yml        # code quality gate on lib/ (minimum score 87)
+  test.yml              # runs ruby test.rb on every pull request and on master
+  rubycritic.yml        # code quality gate on lib/ (minimum score 91)
   weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
@@ -72,18 +83,34 @@ test/
 
 ### Naming conventions
 
-- `*Client` — queries an external API (`SensacineClient`, `TmdbClient`)
-- `*Messenger` — delivers output (`TelegramMessenger`, `StdoutMessenger`)
-- All Clients and all Messengers share the same call site: plain `.new`. Classes with no config use `def initialize(**) = nil`.
-- Each class exposes a `DOMAIN` constant at the top for its base URL.
+- Folders name layers, and Zeitwerk maps them to namespaces: `Showtimes::`
+  providers, `Movies::` for TMDB, `Messengers::` for delivery, `Digest::` for
+  rendering, `Http::` for the network. A new class needs a file in the right
+  place and nothing else — there is no `require_relative` below `lib/vo_cinema.rb`.
+- A provider answers `sessions_for(cinema, date)`; a messenger answers
+  `send_message(text)`. Both are built with a plain `.new`.
+- Each class that talks to a service exposes a `DOMAIN` constant and its own
+  `HEADERS`, composed from `Http::Client::BROWSER`.
+- `VoCinema::Digest` deliberately shadows nothing: stdlib `::Digest` is still
+  reachable, because no file inside the namespace refers to it unqualified.
 
 ### `WeeklyNotifier` interface
 
 ```ruby
-WeeklyNotifier.new(showtimes:, movies_db:, messenger:, cinemas:).run(today: Date.today)
+VoCinema::WeeklyNotifier.new(
+  showtimes: [Showtimes::Sensacine.new, Showtimes::Yelmo.new],  # least → most authoritative
+  movies_db: Movies::Tmdb.new,
+  messenger: Messengers::Telegram.new,
+  cinemas:   Cinema.all
+).run(today: Date.today)
 ```
 
-Any conforming Client or Messenger can be swapped in without touching the orchestrator.
+`showtimes` is an ordered list. Every provider is asked about every cinema and
+answers with nothing for a venue it does not cover — the notifier keeps no
+table of which provider runs what, because each provider reads its own id out
+of the `Cinema`. Where two describe the same screening **the later one wins**,
+so Yelmo goes last: it is right about its own cinema, which SensaCine
+systematically misfiles.
 
 ## SensaCine API
 
@@ -193,6 +220,21 @@ and stops a terminal digest being cut short for a limit that does not apply to
 it. Adding a second renderer per channel was considered and rejected: with one
 real channel there is nothing to generalise over yet, and a messenger that
 adapts what it is given is far less machinery than a renderer per format.
+
+**Fetching is separate from reading** — each provider is two classes: one that
+makes requests (`Showtimes::Sensacine`, `Showtimes::Yelmo`) and one that turns
+a payload into `ScreeningSession`s (`Sensacine::Day`, `Yelmo::Listing`). The
+fetchers know about URLs, pagination and caching; the readers know about
+buckets, language tags and timestamps and could not make a request if they
+wanted to. That split, plus moving every socket into `Http::Client`, is what
+took `lib/` from 89.96 to 92.19 on RubyCritic.
+
+**One HTTP client, one set of manners** — `Http::Client` is the only code in
+the project that touches `Net::HTTP`. It owns the retry, the pacing between
+requests, the request logging, and `BROWSER`, the User-Agent and
+Accept-Language that both scraped endpoints demand. `bin/diagnose.rb` and
+`bin/capture_fixtures.rb` go through it too, so a probe cannot accidentally ask
+in a way the service never would.
 
 **Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
 providers, decides which screenings survive, and enriches each film;

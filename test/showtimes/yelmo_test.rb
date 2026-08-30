@@ -1,26 +1,27 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/yelmo_client"
 
-# YelmoClient exists because SensaCine gets Yelmo wrong: it files the cinema's
+# Showtimes::Yelmo exists because SensaCine gets Yelmo wrong: it files the cinema's
 # subtitled screenings in the dubbed bucket alongside the Spanish ones. Yelmo's
 # own listings label each print's language, so for that venue they are the
 # authority.
 #
 # Yelmo answers with a whole city at once, so the client asks once and indexes
 # the reply by day.
-class YelmoClientTest < ServiceTest
+class YelmoTest < ServiceTest
   OCIMAX_GIJON = "asturias/ocimax-gijon"
+
+  include Screenings
 
   def setup
     @http   = FakeHttp.new
-    @client = YelmoClient.new
+    @client = Showtimes::Yelmo.new(http: Http::Client.new(headers: Showtimes::Yelmo::HEADERS))
     @http.answers "yelmocines.es", body: Fixtures.read("yelmo/now_playing_asturias.json")
   end
 
   def sessions_on(date, theater_id: OCIMAX_GIJON)
-    @http.while_intercepting { @client.fetch_theater_movie_sessions(date: date, theater_id: theater_id) }
+    @http.while_intercepting { @client.sessions_for(cinema("Ocimax", yelmo_id: theater_id), date) }
   end
 
   def test_it_asks_yelmo_for_a_whole_city_at_once
@@ -81,8 +82,9 @@ class YelmoClientTest < ServiceTest
     # The notifier walks a week a day at a time. Doing that against a provider
     # that answers with the whole city would be seven identical requests.
     @http.while_intercepting do
+      ocimax = cinema("Ocimax", yelmo_id: OCIMAX_GIJON)
       %w[2026-08-29 2026-08-30 2026-08-31 2026-09-01 2026-09-02 2026-09-03 2026-09-04].each do |date|
-        @client.fetch_theater_movie_sessions(date: date, theater_id: OCIMAX_GIJON)
+        @client.sessions_for(ocimax, date)
       end
     end
 
@@ -103,11 +105,11 @@ class YelmoClientTest < ServiceTest
 
   def test_a_provider_that_will_not_answer_yields_nothing
     http   = FakeHttp.new
-    client = YelmoClient.new
+    client = Showtimes::Yelmo.new(http: Http::Client.new(headers: Showtimes::Yelmo::HEADERS))
     http.answers "yelmocines.es", status: "500"
 
     sessions = http.while_intercepting do
-      client.fetch_theater_movie_sessions(date: "2026-08-29", theater_id: OCIMAX_GIJON)
+      client.sessions_for(cinema("Ocimax", yelmo_id: OCIMAX_GIJON), "2026-08-29")
     end
 
     assert_empty sessions
