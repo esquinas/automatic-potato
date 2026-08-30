@@ -86,11 +86,13 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     assert outbox.digest.mentions?("Nothing left to catch")
   end
 
-  def test_tmdb_is_asked_about_a_film_once_however_often_it_screens
-    # Fourteen screenings of the same film is fourteen chances to ask TMDB the
-    # same question. The answer is remembered for the length of the run.
-    querido      = film("El ser querido", year: 2026)
-    all_week     = (0..6).flat_map do |offset|
+  def test_a_film_screening_all_week_is_asked_about_per_screening
+    # Fourteen screenings, fourteen questions. The notifier keeps no cache of
+    # its own: remembering what TMDB said is the movie database's business, and
+    # Movies::Tmdb answers a repeated question without a second request — see
+    # test/movies/tmdb_test.rb.
+    querido  = film("El ser querido", year: 2026)
+    all_week = (0..6).flat_map do |offset|
       day = (MONDAY + offset).to_s
       [screening(querido, on: day, at: "19:00", original_version: false),
        screening(querido, on: day, at: "21:30", original_version: false)]
@@ -100,7 +102,7 @@ class WeeklyNotifierVoFilterTest < ServiceTest
     WeeklyNotifier.new(showtimes: [Listings.new("Ocine Premium Los Fresnos" => all_week)], movies_db: tmdb,
                        messenger: Outbox.new, cinemas: [COMMERCIAL_CINEMA]).run(today: MONDAY)
 
-    assert_equal 1, tmdb.times_asked(:spanish_original?, "El ser querido")
+    assert_equal 14, tmdb.times_asked(:spanish_original?, "El ser querido")
   end
 
   def test_a_screening_already_known_to_be_in_original_version_costs_no_tmdb_call

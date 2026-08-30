@@ -24,6 +24,50 @@ class TmdbTest < ServiceTest
     @http.while_intercepting(&block)
   end
 
+  def test_the_same_question_twice_costs_one_request
+    # #fetch_original_title and #spanish_original? ask TMDB exactly the same
+    # thing, and the notifier asks about every screening rather than every
+    # film, so a film showing all week used to send the same query fourteen
+    # times over.
+    answering_with("tmdb/search_el_ser_querido.json")
+    querido = Film.new(localized_title: "El ser querido", year: 2026)
+
+    asking do
+      7.times do
+        @client.fetch_original_title(querido)
+        @client.spanish_original?(querido)
+      end
+    end
+
+    assert_equal 1, @http.requests.length
+  end
+
+  def test_two_different_films_are_two_requests
+    # The cache remembers an answer, it does not stop asking new questions.
+    @http.answers "query=La+sustancia",    body: Fixtures.read("tmdb/search_la_sustancia.json")
+    @http.answers "api.themoviedb.org",    body: Fixtures.read("tmdb/search_el_ser_querido.json")
+
+    asking do
+      @client.fetch_original_title(Film.new(localized_title: "La sustancia", year: 2024))
+      @client.fetch_original_title(Film.new(localized_title: "El ser querido", year: 2026))
+    end
+
+    assert_equal 2, @http.requests.length
+  end
+
+  def test_the_same_title_in_two_different_years_is_two_questions
+    # Nosferatu 1922 and Nosferatu 2024 are not the same film, and the year is
+    # part of the query, so it has to be part of what is remembered.
+    @http.answers "api.themoviedb.org", body: Fixtures.read("tmdb/search_no_results.json")
+
+    asking do
+      @client.fetch_original_title(Film.new(localized_title: "Nosferatu", year: 1922))
+      @client.fetch_original_title(Film.new(localized_title: "Nosferatu", year: 2024))
+    end
+
+    assert_equal 2, @http.requests.length
+  end
+
   def test_it_searches_by_the_spanish_release_title
     answering_with("tmdb/search_la_sustancia.json")
     film = Film.new(localized_title: "La sustancia", year: 2024)
