@@ -4,15 +4,17 @@ require "date"
 
 # Two providers describing the same cinema, and how their accounts are settled.
 #
-# The notifier is given an ordered list of showtimes providers and asks every
-# one of them about every cinema. A provider that does not cover a venue says
-# so by answering with nothing, and where two describe the same screening the
-# later one in the list is believed — so the list runs from least to most
-# authoritative.
+# The notifier asks every provider about every cinema; one that does not cover
+# a venue says so by answering with nothing. Where several describe the same
+# screening they become one, and it is the original version if ANY of them
+# said so.
 #
-# For Ocimax that ordering is the whole point: SensaCine files Yelmo's
-# subtitled prints under "dubbed" alongside the Spanish ones, which used to
-# empty the section for the venue most likely to have something worth seeing.
+# That rule is not a coin toss between equals. Calling a screening original
+# version takes information; calling it dubbed is what a provider says when it
+# has none. SensaCine files Yelmo's subtitled prints under "dubbed", and Yelmo
+# labels a Spanish film "ESPAÑOL" when that print is the original — both are
+# absences of evidence, and neither should be able to veto the other's
+# positive.
 class WeeklyNotifierMergeTest < ServiceTest
   include Screenings
 
@@ -44,19 +46,43 @@ class WeeklyNotifierMergeTest < ServiceTest
     assert_equal ["17:00"], outbox.digest.times_listed_for("Harry Potter y la Piedra Filosofal")
   end
 
-  def test_the_last_provider_is_believed_even_when_it_is_the_less_generous_one
-    # The rule is positional, not "whoever says original version wins". Yelmo
-    # is listed last because it is right about its own cinema — including when
-    # being right means a screening SensaCine advertised as VO is not.
+  def test_when_providers_disagree_the_one_claiming_original_version_is_believed
+    # Whichever of them says it, and whichever way round they are asked.
+    potter = film("Harry Potter y la Piedra Filosofal", year: 2001)
+
+    only_sensacine_says_so = digest_from(
+      sensacine: [screening(potter, on: "2026-09-04", at: "20:30", original_version: true)],
+      yelmo:     [screening(potter, on: "2026-09-04", at: "20:30", original_version: false)]
+    )
+
+    assert_equal ["20:30"], only_sensacine_says_so.digest.times_listed_for("Harry Potter y la Piedra Filosofal")
+  end
+
+  def test_a_screening_neither_provider_calls_original_version_is_dropped
+    # The union is over positives; it does not invent one.
     potter = film("Harry Potter y la Piedra Filosofal", year: 2001)
 
     outbox = digest_from(
-      sensacine: [screening(potter, on: "2026-09-04", at: "20:30", original_version: true)],
+      sensacine: [screening(potter, on: "2026-09-04", at: "20:30", original_version: false)],
       yelmo:     [screening(potter, on: "2026-09-04", at: "20:30", original_version: false)]
     )
 
     assert outbox.digest.mentions?("Nothing left to catch")
     refute outbox.digest.mentions?("Harry Potter")
+  end
+
+  def test_the_order_the_providers_are_given_in_does_not_change_the_digest
+    # A union has no favourites. Should a genuinely more authoritative provider
+    # turn up, it will need conciliation logic of its own rather than a place
+    # in this list — see the note in CLAUDE.md.
+    potter    = film("Harry Potter y la Piedra Filosofal", year: 2001)
+    dubbed    = [screening(potter, on: "2026-09-04", at: "20:30", original_version: false)]
+    subtitled = [screening(potter, on: "2026-09-04", at: "20:30", original_version: true)]
+
+    one_way   = digest_from(sensacine: dubbed,    yelmo: subtitled)
+    other_way = digest_from(sensacine: subtitled, yelmo: dubbed)
+
+    assert_equal one_way.digest.text, other_way.digest.text
   end
 
   def test_a_screening_both_providers_report_is_listed_once

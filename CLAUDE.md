@@ -98,19 +98,21 @@ test/
 
 ```ruby
 VoCinema::WeeklyNotifier.new(
-  showtimes: [Showtimes::Sensacine.new, Showtimes::Yelmo.new],  # least → most authoritative
+  showtimes: [Showtimes::Sensacine.new, Showtimes::Yelmo.new],  # order does not matter
   movies_db: Movies::Tmdb.new,
   messenger: Messengers::Telegram.new,
   cinemas:   Cinema.all
 ).run(today: Date.today)
 ```
 
-`showtimes` is an ordered list. Every provider is asked about every cinema and
-answers with nothing for a venue it does not cover — the notifier keeps no
-table of which provider runs what, because each provider reads its own id out
-of the `Cinema`. Where two describe the same screening **the later one wins**,
-so Yelmo goes last: it is right about its own cinema, which SensaCine
-systematically misfiles.
+Every provider is asked about every cinema and answers with nothing for a venue
+it does not cover — the notifier keeps no table of which provider runs what,
+because each provider reads its own id out of the `Cinema`.
+
+Where several describe the same screening they become one, and it is original
+version **if any of them said so**. The order they are listed in changes
+nothing. If a genuinely more authoritative provider ever turns up, it wants
+conciliation logic of its own rather than a privileged place in this list.
 
 ## SensaCine API
 
@@ -221,6 +223,23 @@ it. Adding a second renderer per channel was considered and rejected: with one
 real channel there is nothing to generalise over yet, and a messenger that
 adapts what it is given is far less machinery than a renderer per format.
 
+**A positive VO signal beats a negative one, whoever it comes from** — the
+providers' two claims are not equally reliable. Saying "original version" takes
+information: a bucket named for it, a `diffusionVersion` of `"ORIGINAL"`, a
+VOSE language tag. Saying "dubbed" is what a provider says when it has none,
+which is why SensaCine files Yelmo's subtitled prints that way, and why Yelmo
+labels a Spanish production `"ESPAÑOL"` when that print *is* the original. A
+negative is an absence of evidence; a positive is evidence. So
+`WeeklyNotifier#merge` unions the positives, and the whole pipeline reads the
+same way at every level — `Sensacine::Day` ORs bucket against
+`diffusionVersion`, `#collect_sessions` ORs that against TMDB's
+`spanish_original?`, and the merge ORs across providers.
+
+The cost is accepted deliberately: a dubbed screening can reach the digest on
+one provider's bad word. The box office states which print it is before anyone
+pays, and cinemas guard hard against the opposite mistake — an audience
+expecting dubbing and finding subtitles is the complaint they actually get.
+
 **Fetching is separate from reading** — each provider is two classes: one that
 makes requests (`Showtimes::Sensacine`, `Showtimes::Yelmo`) and one that turns
 a payload into `ScreeningSession`s (`Sensacine::Day`, `Yelmo::Listing`). The
@@ -269,3 +288,35 @@ on what the digest says rather than on how it is assembled.
 **A film is compared across providers by `Film#key`** — the localized title downcased and stripped, because SensaCine and Yelmo disagree about capitals and stray spaces. `ScreeningSession#slot` (`[date, starts_at, film.key]`) is built on it and is what `WeeklyNotifier#merge_sessions` groups by. Note that `Film#==` is stricter: it counts the year too, so `Nosferatu` 1922 and 2024 stay two films.
 
 **`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+
+## Known gaps
+
+Recorded rather than fixed, with enough context to pick up cold.
+
+**Identify a film canonically, not by its title.** `ScreeningSession#slot`
+matches providers on `[date, starts_at, film.key]`, and `key` is the localized
+title downcased and stripped. Providers spell the same film differently —
+Ocimax's Harry Potter is `"Harry Potter y la Piedra Filosofal"` on SensaCine
+and `"Harry Potter y la Piedra Filosofal 25 Aniversario"` on Yelmo — so those
+records never group, and the VO union never fires for them. The screening still
+reaches the digest under Yelmo's name, so nothing is lost today, but the
+reconciliation is narrower than it looks. Many providers carry the IMDB id as a
+universal canonical identifier and TMDB exposes it too; what each of *our*
+providers actually exposes needs research before committing to one.
+
+**Reconcile the spelling of a film's title.** Once two records do group, the
+digest prints whichever provider's spelling won — `key` ignores case and
+surrounding space, so `"La Sustancia"` and `"La sustancia"` are the same film
+but only one of them prints. `WeeklyNotifier#agreed` currently takes the first
+record's film, which makes it a function of list order in the one place order
+still shows. It wants a rule of its own: TMDB's spelling, or the most common,
+or the shortest.
+
+**Log how often the providers disagree.** With the union rule a provider that
+quietly stops tagging VO is invisible: the others carry, and the digest just
+gets thinner. Ocimax is described by two independent providers, which makes
+their disagreement rate a free drift detector — count the slots where they
+differ on `original_version?` and print it once per run. A stable rate means
+both are healthy; a jump, or a collapse to zero, means one of them has changed
+shape. This belongs in the run log, not in the Telegram digest: provider health
+is not something a subscriber should have to read about.

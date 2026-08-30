@@ -6,12 +6,9 @@ module VoCinema
   # The orchestrator: collect the week's screenings cinema by cinema, enrich
   # each film with what TMDB knows, hand the result to the renderer, send it.
   #
-  # It takes an ordered list of showtimes providers and asks every one of them
-  # about every cinema; a provider that does not cover a venue says so by
-  # answering with nothing. Where two describe the same screening the later one
-  # is believed, so the list runs from least to most authoritative — SensaCine
-  # first, then Yelmo, which is right about its own cinema and which SensaCine
-  # systematically misfiles.
+  # It takes a list of showtimes providers and asks every one of them about
+  # every cinema; a provider that does not cover a venue says so by answering
+  # with nothing. The order they are given in does not matter — see #merge.
   class WeeklyNotifier
     WEEK_DAYS = 7
 
@@ -69,12 +66,32 @@ module VoCinema
       WEEK_DAYS.times.flat_map { |offset| provider.sessions_for(cinema, (today + offset).to_s) }
     end
 
-    # Providers are listed least to most authoritative, so where several
-    # describe the same slot the last word wins.
+    # One screening, however many providers mentioned it — and original version
+    # if ANY of them said so.
+    #
+    # The two claims are not equally reliable. Saying "original version" takes
+    # information: a bucket named for it, a diffusionVersion of "ORIGINAL", a
+    # VOSE language tag. Saying "dubbed" is what a provider says when it has
+    # nothing, which is why SensaCine files Yelmo's subtitled prints that way,
+    # and why Yelmo labels a Spanish film "ESPAÑOL" when that print is the
+    # original. A negative is an absence of evidence; a positive is evidence.
+    #
+    # So a dubbed screening can reach the digest on one provider's bad word.
+    # That is an accepted cost: the box office says which print it is before
+    # anyone pays, and cinemas are far more careful about the opposite mistake
+    # — an audience expecting dubbing and getting subtitles complains.
+    #
+    # Nothing here depends on the order the providers were given in.
     def merge(weeks)
       lend_known_years(weeks)
 
-      weeks.flatten.group_by(&:slot).values.map(&:last)
+      weeks.flatten.group_by(&:slot).values.map { |group| agreed(group) }
+    end
+
+    # The first record supplies the screening; every record gets a vote on
+    # whether it is the original version.
+    def agreed(group)
+      group.first.with(original_version?: group.any?(&:original_version?))
     end
 
     # Only SensaCine reports a year, and a Film is only the same film when the
