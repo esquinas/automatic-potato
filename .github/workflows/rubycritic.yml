@@ -23,9 +23,9 @@ jobs:
       - name: Install RubyCritic
         run: gem install rubycritic
 
-      # lib/ scores 88.54 as of the DigestRenderer extraction. The gate sits a
-      # point and a half under that on purpose: tight enough to catch real
-      # decay, loose enough that an ordinary addition does not turn CI red and
-      # train the next person to lower the number.
+      # lib/ scores 89.98 as of the Timetable extraction and the HttpClient
+      # merge. The gate sits about two points under that on purpose: tight
+      # enough to catch real decay, loose enough that an ordinary addition does
+      # not turn CI red and train the next person to lower the number.
       - name: Run RubyCritic
-        run: rubycritic --minimum-score 87 --format console --no-browser lib
+        run: rubycritic --minimum-score 89 --format console --no-browser lib

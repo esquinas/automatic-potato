@@ -5,6 +5,10 @@ require "uri"
 require_relative "http_client"
 require_relative "rating"
 
+# What TMDB knows about a film the cinemas listed in Spanish: its original
+# title, its rating, and whether it is a Spanish production.
+#
+# Three pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
 class TmdbClient
   include HttpClient
 

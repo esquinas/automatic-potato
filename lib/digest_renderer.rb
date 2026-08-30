@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "date"
+require_relative "timetable"
 
 # Turns a week's listings into the message a subscriber reads.
 #
@@ -30,7 +31,8 @@ class DigestRenderer
 
   def cinema_heading(listing)
     label = "#{listing.name} — #{@today} → #{week_end}"
-    listing.url ? "<b><a href=\"#{listing.url}\">#{label}</a></b>" : "<b>#{label}</b>"
+    url   = listing.url
+    url ? "<b><a href=\"#{url}\">#{label}</a></b>" : "<b>#{label}</b>"
   end
 
   def week_end = (@today + @week_days - 1).to_s
@@ -53,32 +55,7 @@ class DigestRenderer
     original && original.downcase != film.localized_title.downcase
   end
 
-  def showtimes_block(sessions)
-    by_date = sessions.group_by(&:date)
-                      .transform_values { |group| group.map(&:starts_at).sort.uniq }
-                      .sort.to_h
-    width   = by_date.values.flatten.map(&:length).max
-    body    = by_date.length == @week_days ? all_week(by_date, width) : day_by_day(by_date, width)
-
-    "<pre>#{body}</pre>"
-  end
-
-  # A film showing every single day would otherwise take seven lines and crowd
-  # out the one-off screenings that are the point of the digest.
-  def all_week(by_date, width)
-    "• All week: #{by_date.keys.min} → #{by_date.keys.max}\n  " \
-      "#{aligned(by_date.values.flatten.sort.uniq, width)}"
-  end
-
-  def day_by_day(by_date, width)
-    by_date.map { |date, times| "• #{weekday(date)} → #{aligned(times, width)}" }.join("\n")
-  end
-
-  def aligned(times, width)
-    times.map { |time| time.rjust(width) }.join(", ")
-  end
-
-  def weekday(date) = Date.parse(date).strftime("%a")
+  def showtimes_block(sessions) = "<pre>#{Timetable.new(sessions, week_days: @week_days)}</pre>"
 
   # Both providers list only screenings you could still buy a ticket for, so a
   # day drains as its programme runs and a venue that came back empty has not

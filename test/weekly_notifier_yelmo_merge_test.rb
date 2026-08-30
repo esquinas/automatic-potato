@@ -76,6 +76,48 @@ class WeeklyNotifierYelmoMergeTest < ServiceTest
     assert_equal ["17:00"], outbox.digest.times_listed_for("Harry Potter y la Piedra Filosofal")
   end
 
+  def test_a_film_only_one_provider_can_date_is_still_one_film
+    # SensaCine reports the year a film was made and Yelmo does not, so the two
+    # records of one film disagree about it. They still have to reach the
+    # digest as a single entry with the whole week under it, rather than as the
+    # same title printed twice with its showtimes split between the two.
+    outbox = Outbox.new
+
+    WeeklyNotifier.new(
+      showtimes: Listings.new("E0628" => [
+        screening(film("La constelación del perro", year: 2026), on: "2026-09-04", at: "18:45")
+      ]),
+      yelmo_showtimes: Listings.new("asturias/ocimax-gijon" => [
+        screening(film("La constelación del perro"), on: "2026-09-04", at: "21:15")
+      ]),
+      movies_db: MovieDatabase.new,
+      messenger: outbox,
+      cinemas:   [OCIMAX]
+    ).run(today: MONDAY)
+
+    assert_equal ["18:45", "21:15"], outbox.digest.times_listed_for("La constelación del perro")
+  end
+
+  def test_the_year_one_provider_knows_is_used_to_look_the_other_one_up
+    # Which is worth doing for its own sake: the TMDB search that Yelmo's
+    # yearless record would have gone into unfiltered gets the year too.
+    yelmos_record = film("La constelación del perro")
+
+    WeeklyNotifier.new(
+      showtimes: Listings.new("E0628" => [
+        screening(film("La constelación del perro", year: 2026), on: "2026-09-04", at: "18:45")
+      ]),
+      yelmo_showtimes: Listings.new("asturias/ocimax-gijon" => [
+        screening(yelmos_record, on: "2026-09-04", at: "21:15")
+      ]),
+      movies_db: MovieDatabase.new,
+      messenger: Outbox.new,
+      cinemas:   [OCIMAX]
+    ).run(today: MONDAY)
+
+    assert_equal 2026, yelmos_record.year
+  end
+
   def test_providers_are_matched_up_by_day_time_and_title
     # Yelmo bills the same screening as "…25 Aniversario", so the two records
     # are not recognised as one. That is survivable: the dubbed SensaCine entry

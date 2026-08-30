@@ -15,6 +15,8 @@ git push -u origin <branch-name>
 
 Each branch maps to exactly one PR. When master moves forward (merged PRs), always rebase or re-cut before opening a new PR so it has a single, clean commit on top of current master.
 
+**One exception:** a refactor that wins back the RubyCritic score the change cost, on the code that change touched or exposed, rides along on its branch as a commit of its own.
+
 ## Commands
 
 ```bash
@@ -36,17 +38,18 @@ Each class reads its own secrets from ENV as default keyword arguments — plain
 
 ```
 lib/
-  http_client.rb        # shared HTTP module (retry, jitter) — included by clients
+  http_client.rb        # shared HTTP module (one retry, jitter) — included by clients
   sensacine_client.rb   # fetches showtimes from SensaCine internal JSON API
   tmdb_client.rb        # searches TMDB for original title + rating
   telegram_messenger.rb # sends message via Telegram Bot API
   stdout_messenger.rb   # sends message to stdout (dev/testing)
   film.rb               # mutable PORO: localized_title + year always set; title filled after TMDB lookup
-  screening_session.rb  # Data.define: film, date, starts_at, original_version?
+  screening_session.rb  # Data.define: film, date, starts_at, original_version?; #slot identifies a screening across providers
   rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
   yelmo_client.rb       # authoritative VO source for Yelmo Ocimax Gijón
   cinema_listing.rb     # Data.define: one cinema's week, enriched and ready to print
   digest_renderer.rb    # pure: turns listings into the Telegram message
+  timetable.rb          # pure: one film's week, grouped by day and aligned into a column
   weekly_notifier.rb    # orchestrator: collect → enrich → render → send
 bin/
   run.rb                # thin entry point: four plain .new calls
@@ -129,7 +132,9 @@ Consequences, all of which are easy to get wrong:
 - `test/fixtures/sensacine/nothing_left_that_day.json` was captured at 01:26
   local asking about the previous day, and records the behaviour.
 
-**Release year:** `SensacineClient` reads `movie.release.year`, which the current feed does not have — the production year lives at `movie.data.productionYear`, and the release dates under `movie.releases[]`. So `Film#year` is `nil` for every SensaCine film and TMDB is searched without its year filter. Nothing downstream breaks (the digest never prints the year), but matches are looser than intended. `test/sensacine_client_test.rb` records this.
+**Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
+
+Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `WeeklyNotifier#lend_known_years` closes that at merge time by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
 
@@ -170,6 +175,14 @@ log between `===== BEGIN fixture: … =====` markers; see
 
 ## Design decisions
 
+**One film's timetable is its own object** — `Timetable` takes a film's
+sessions and lays them out: grouped by day, right-aligned into a column, and
+collapsed to a single "All week" line when the film shows every day. It emits
+plain text and knows nothing about Telegram markup, so `DigestRenderer` keeps
+deciding how the digest is dressed and stops having to know how a column of
+times is squared up. The extraction is what took `DigestRenderer` off a C
+rating; as with the split below, the test suite needed no edit.
+
 **Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
 providers, decides which screenings survive, and enriches each film;
 `DigestRenderer` turns the result into text and asks nobody anything. The
@@ -198,6 +211,8 @@ on what the digest says rather than on how it is assembled.
 
 **`DOMAIN` constant per class** — base URL extracted to the top of each file. Renaming a service is a single-line edit, and derived strings (headers, paths) reference `DOMAIN` via interpolation so they update automatically.
 
-**`HttpClient` is a module, not a base class** — shared retry-with-jitter logic is included by `SensacineClient` and `TmdbClient`. The module keeps it encapsulated without imposing an inheritance hierarchy.
+**`HttpClient` is a module, not a base class** — shared retry-with-jitter logic is included by `SensacineClient`, `TmdbClient` and `YelmoClient`. The module keeps it encapsulated without imposing an inheritance hierarchy. GET and POST differ only in the request they build, so they hand a block to one `with_one_retry`: attempt, pause, and on anything but a 200 attempt once more behind a much longer pause. The block builds a fresh request each time — a `Net::HTTP` request that has been on the wire once is not safe to send again.
+
+**A film is compared across providers by `Film#key`** — the localized title downcased and stripped, because SensaCine and Yelmo disagree about capitals and stray spaces. `ScreeningSession#slot` (`[date, starts_at, film.key]`) is built on it and is what `WeeklyNotifier#merge_sessions` groups by. Note that `Film#==` is stricter: it counts the year too, so `Nosferatu` 1922 and 2024 stay two films.
 
 **`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.

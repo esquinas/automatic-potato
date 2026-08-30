@@ -183,21 +183,43 @@ class SensacineClientTest < ServiceTest
     assert_equal 2, @http.requests.length
   end
 
-  def test_the_feed_keeps_the_production_year_where_the_client_does_not_look
-    # SensaCine puts the production year under movie.data, and the release
-    # dates under movie.releases[]. There is no movie.release.year, which is
-    # what SensacineClient reads — so Film#year is nil for every SensaCine film
-    # and TMDB gets searched without its year filter. Matches are looser than
-    # they were designed to be; nothing downstream breaks, because the digest
-    # never prints the year. Recorded in CLAUDE.md, to be fixed on its own.
-    #
-    # What is asserted here is the feed's shape, not the consequence: if
-    # SensaCine ever moves the field back, this goes red and says so, and
-    # whoever fixes the client is not left explaining a failure they caused.
-    entry = Fixtures.parse("sensacine/ocimax_all_dubbed.json")["results"].first
+  def test_a_film_carries_the_year_it_was_made
+    # The year is what narrows the TMDB search: without it, "Harry Potter y la
+    # Piedra Filosofal" is as good a match for the 25th-anniversary re-release
+    # as for the film itself. SensaCine keeps it under movie.data.
+    sessions = laboral_sessions
 
-    assert_equal 2026, entry.dig("movie", "data", "productionYear")
-    assert_nil entry.dig("movie", "release", "year")
+    potter = find_session(sessions, "Harry Potter y la Piedra Filosofal", "17:00")
+
+    assert_equal 2001, potter.film.year
+  end
+
+  def test_a_film_with_no_production_year_falls_back_to_its_first_release
+    # Some entries reach the feed with the movie.data block half filled in.
+    # The release dates are the next best thing, and the earliest of them is
+    # the one that dates the film rather than a re-release.
+    feed = Fixtures.parse("sensacine/ocimax_all_dubbed.json")
+    feed["results"][0]["movie"]["data"].delete("productionYear")
+    @http.answers "sensacine.com", body: JSON.generate(feed)
+
+    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    dog_stars = find_session(sessions, "La constelación del perro", "18:45")
+
+    assert_equal 2026, dog_stars.film.year
+  end
+
+  def test_a_film_the_feed_dates_nowhere_at_all_simply_has_no_year
+    # A yearless film is still worth listing; TMDB is asked about it without
+    # the year filter rather than not asked at all.
+    feed = Fixtures.parse("sensacine/ocimax_all_dubbed.json")
+    feed["results"][0]["movie"]["data"].delete("productionYear")
+    feed["results"][0]["movie"]["releases"] = []
+    @http.answers "sensacine.com", body: JSON.generate(feed)
+
+    sessions = sessions_for(date: "2026-08-28", theater_id: "E0628")
+    dog_stars = find_session(sessions, "La constelación del perro", "18:45")
+
+    assert_nil dog_stars.film.year
   end
 
   private
