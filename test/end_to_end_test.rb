@@ -174,6 +174,20 @@ class EndToEndTest < ServiceTest
     assert_equal 1, @http.requests_to("yelmocines.es").length, "one city, cached for the week"
   end
 
+  def test_tmdb_is_asked_each_distinct_question_once
+    # Nine questions about six films: each is looked up by its Spanish title,
+    # and then again by its original title for the rating. Before Movies::Tmdb
+    # remembered its answers this week cost fifteen requests for the same nine
+    # queries, because #fetch_original_title and #spanish_original? ask
+    # identically and the notifier asks per screening.
+    digest
+
+    searches = @http.requests_to("api.themoviedb.org").map(&:url)
+
+    assert_equal 9, searches.length
+    assert_equal searches.uniq.length, searches.length, "the same query went out twice"
+  end
+
   def test_the_whole_week_fits_in_one_telegram_message
     # Deliberately not an exact-match assertion on the text: that would break
     # on every intentional wording change, and the tests above already pin down

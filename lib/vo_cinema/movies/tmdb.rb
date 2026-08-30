@@ -16,6 +16,7 @@ module VoCinema
       def initialize(api_key: ENV.fetch("TMDB_API_KEY"), http: Http::Client.new)
         @api_key = api_key
         @http    = http
+        @results = {}
       end
 
       def fetch_original_title(film)
@@ -51,7 +52,18 @@ module VoCinema
         score
       end
 
+      # One request per question per run, however often it is asked.
+      #
+      # #fetch_original_title and #spanish_original? ask TMDB exactly the same
+      # thing, and the notifier asks about every screening of a film rather
+      # than every film, so the same query went out two or three times over
+      # before this. A client is built once per run, which makes it the right
+      # lifetime for the answers.
       def search(title, year = nil)
+        @results[[title, year]] ||= fetch(title, year)
+      end
+
+      def fetch(title, year)
         query = URI.encode_www_form(query: title, language: "es-ES", api_key: @api_key)
         query += "&year=#{year}" if year
         response = @http.get("#{DOMAIN}/3/search/movie?#{query}")

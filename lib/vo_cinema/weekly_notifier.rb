@@ -13,11 +13,10 @@ module VoCinema
     WEEK_DAYS = 7
 
     def initialize(showtimes:, movies_db:, messenger:, cinemas:)
-      @showtimes              = Array(showtimes)
-      @movies_db              = movies_db
-      @messenger              = messenger
-      @cinemas                = cinemas
-      @spanish_original_cache = {}
+      @showtimes = Array(showtimes)
+      @movies_db = movies_db
+      @messenger = messenger
+      @cinemas   = cinemas
     end
 
     def run(today: Date.today)
@@ -59,7 +58,13 @@ module VoCinema
 
       return sessions unless cinema.check_vo
 
-      sessions.select { |session| session.original_version? || spanish_original?(session.film) }
+      # A film with no dubbed/subtitled distinction (e.g. a Spanish production)
+      # never gets tagged VO by a provider, since there is nothing to dub or
+      # subtitle — its only screening IS the original version. TMDB's
+      # original_language is the only way to tell that apart from a foreign
+      # film dubbed into Spanish. Asked once per screening and answered from
+      # the movie database's own cache, not one kept here.
+      sessions.select { |session| session.original_version? || @movies_db.spanish_original?(session.film) }
     end
 
     def week_from(provider, cinema, today)
@@ -106,14 +111,5 @@ module VoCinema
     end
 
     def years_known_for(films) = films.filter_map { |film| [film.key, film.year] if film.year }.to_h
-
-    # A film with no dubbed/subtitled distinction (e.g. a Spanish production)
-    # never gets tagged VO by a provider, since there's nothing to dub or
-    # subtitle — its only screening IS the original version. TMDB's
-    # original_language is the only way to tell that apart from a foreign film
-    # dubbed into Spanish.
-    def spanish_original?(film)
-      @spanish_original_cache.fetch(film) { @spanish_original_cache[film] = @movies_db.spanish_original?(film) }
-    end
   end
 end
