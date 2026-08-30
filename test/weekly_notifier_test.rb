@@ -261,9 +261,10 @@ class WeeklyNotifierTest < ServiceTest
     assert_equal 1, outbox.messages.length
   end
 
-  def test_an_unusually_busy_week_is_cut_short_rather_than_rejected_by_telegram
-    # Telegram refuses anything over 4096 characters outright, which would cost
-    # the whole digest. A truncated digest still tells you most of the week.
+  def test_an_unusually_busy_week_is_handed_over_whole
+    # The notifier does not shorten anything. Telegram's 4096-character limit
+    # is Telegram's, and TelegramMessenger enforces it; a messenger writing to
+    # a terminal has no such limit and should get the lot.
     crowded_week = (1..60).flat_map do |n|
       title = film("Película número #{n} del ciclo de verano", year: 2026)
       [screening(title, on: "2026-09-04", at: "19:30"), screening(title, on: "2026-09-05", at: "21:00")]
@@ -273,9 +274,10 @@ class WeeklyNotifierTest < ServiceTest
     WeeklyNotifier.new(showtimes: Listings.new("G02A3" => crowded_week), movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
-    assert_operator outbox.messages.first.length, :<, 4096
-    assert outbox.digest.mentions?("truncated")
+    assert_operator outbox.messages.first.length, :>, 4096
+    refute outbox.digest.mentions?("truncated")
     assert outbox.digest.mentions?("Película número 1 del ciclo de verano")
+    assert outbox.digest.mentions?("Película número 60 del ciclo de verano")
   end
 
   def test_a_week_with_nothing_anywhere_still_reports_back

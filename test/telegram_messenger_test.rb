@@ -62,6 +62,30 @@ class TelegramMessengerTest < ServiceTest
     assert_equal "Tadeo Jones y la lámpara maravillosa — Gijón", payload["text"]
   end
 
+  def test_a_digest_too_long_for_telegram_is_cut_short_rather_than_rejected
+    # Telegram refuses anything over 4096 characters outright, which would cost
+    # the whole digest instead of its tail. Better most of the week than none.
+    week_at_a_busy_arthouse = (1..60).map do |n|
+      "<b>Película número #{n} del ciclo de verano</b>\n<pre>• Fri → 19:30, 21:00</pre>"
+    end.join("\n\n")
+
+    deliver(week_at_a_busy_arthouse)
+    delivered = JSON.parse(@http.requests.first.body)["text"]
+
+    assert_operator week_at_a_busy_arthouse.length, :>, 4096, "the digest under test has to be an oversized one"
+    assert_operator delivered.length, :<, 4096
+    assert_includes delivered, "truncated"
+    assert_includes delivered, "Película número 1 del ciclo de verano"
+  end
+
+  def test_a_digest_telegram_will_accept_is_sent_untouched
+    whole_week = "<b>Yelmo Cines Ocimax Gijón</b>\n<pre>• Sat → 19:30</pre>"
+
+    deliver(whole_week)
+
+    assert_equal whole_week, JSON.parse(@http.requests.first.body)["text"]
+  end
+
   def test_it_reads_its_credentials_from_the_environment_by_default
     # bin/run.rb builds it with a bare .new; GitHub Actions supplies the
     # secrets.

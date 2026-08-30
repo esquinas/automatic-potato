@@ -9,8 +9,6 @@ require_relative "timetable"
 # twice and it produces the same text, which is what makes the digest cheap to
 # test and cheap to reason about.
 class DigestRenderer
-  TELEGRAM_MAX_MSG_CHARS = 3800
-
   def initialize(today:, week_days:)
     @today     = today
     @week_days = week_days
@@ -20,7 +18,7 @@ class DigestRenderer
     lines = listings.flat_map { |listing| [*cinema_section(listing), ""] }
     lines.concat(closing_notes(nothing_left_at))
 
-    within_telegram_limit(lines.join("\n").strip)
+    lines.join("\n").strip
   end
 
   private
@@ -68,13 +66,5 @@ class DigestRenderer
     notes += ["Nothing left to catch this week at: #{nothing_left_at.join(", ")}", ""] unless nothing_left_at.empty?
     notes << "Today lists only what is still to come; earlier screenings have already been shown."
     notes
-  end
-
-  # Telegram rejects anything longer outright, which would cost the whole
-  # digest rather than its tail.
-  def within_telegram_limit(message)
-    return message if message.length <= TELEGRAM_MAX_MSG_CHARS
-
-    "#{message[0, TELEGRAM_MAX_MSG_CHARS]}\n... (truncated)"
   end
 end

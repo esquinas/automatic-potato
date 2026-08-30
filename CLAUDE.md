@@ -183,6 +183,17 @@ deciding how the digest is dressed and stops having to know how a column of
 times is squared up. The extraction is what took `DigestRenderer` off a C
 rating; as with the split below, the test suite needed no edit.
 
+**Each messenger owns its medium's constraints** — `TelegramMessenger` holds
+the 4096-character limit (enforced at 3800 with a "truncated" marker) because
+that ceiling is a fact about Telegram, not about the digest; `StdoutMessenger`
+strips the markup, because a terminal cannot use `<b>` and `<pre>`.
+`DigestRenderer` writes one digest in Telegram's flavour and hands it over
+whole, knowing nothing about where it goes. That keeps a local run readable
+and stops a terminal digest being cut short for a limit that does not apply to
+it. Adding a second renderer per channel was considered and rejected: with one
+real channel there is nothing to generalise over yet, and a messenger that
+adapts what it is given is far less machinery than a renderer per format.
+
 **Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
 providers, decides which screenings survive, and enriches each film;
 `DigestRenderer` turns the result into text and asks nobody anything. The
