@@ -6,15 +6,19 @@ name: Capture API fixtures
 #
 # Manual dispatch only: a full capture makes around sixty live requests. Narrow
 # it with the provider input to keep the log short enough to read end to end.
+#
+# The "identity" option runs a different script: bin/probe_identity.rb, which
+# asks whether TMDB recognises the same film through the different names the
+# providers give it. See the comment at the top of that file.
 
 on:
   workflow_dispatch:
     inputs:
       provider:
-        description: "Which provider to capture"
+        description: "Which provider to capture (identity runs the film-identity probe)"
         type: choice
         default: all
-        options: [all, sensacine, yelmo, tmdb]
+        options: [all, sensacine, yelmo, tmdb, identity]
 
 jobs:
   capture:
@@ -28,7 +32,14 @@ jobs:
           bundler-cache: true
 
       - name: Print live API payloads
+        if: inputs.provider != 'identity'
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           PROVIDER: ${{ inputs.provider }}
         run: ruby bin/capture_fixtures.rb
+
+      - name: Probe how the providers name the same film
+        if: inputs.provider == 'identity'
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: ruby bin/probe_identity.rb
