@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/film"
-require_relative "../../lib/rating"
-require_relative "../../lib/screening_session"
-
 # Stand-ins for the notifier's collaborators.
 #
 # These are small real objects rather than strict mocks on purpose. A mock that
@@ -13,19 +9,21 @@ require_relative "../../lib/screening_session"
 # times, in any order, and write down what they were asked so that a test which
 # genuinely cares about the number of calls can say so out loud.
 
-# A showtimes provider whose week is already known. Sessions carry their own
-# date, so it just hands back the ones that belong to the day being asked about.
+# A showtimes provider whose week is already known, keyed by cinema name.
+# Sessions carry their own date, so it hands back the ones belonging to the day
+# being asked about — and nothing at all for a venue it was told nothing about,
+# which is how a real provider says it does not cover a cinema.
 class Listings
-  def initialize(sessions_by_theater)
-    @sessions_by_theater = sessions_by_theater
-    @days_asked_about    = []
+  def initialize(sessions_by_cinema)
+    @sessions_by_cinema = sessions_by_cinema
+    @days_asked_about   = []
   end
 
   attr_reader :days_asked_about
 
-  def fetch_theater_movie_sessions(date:, theater_id:)
-    @days_asked_about << [theater_id, date]
-    @sessions_by_theater.fetch(theater_id, []).select { |session| session.date == date }
+  def sessions_for(cinema, date)
+    @days_asked_about << [cinema.name, date]
+    @sessions_by_cinema.fetch(cinema.name, []).select { |session| session.date == date }
   end
 end
 
@@ -49,7 +47,7 @@ class MovieDatabase
 
   def rating_for(film)
     @questions << [:rating_for, film.localized_title]
-    @ratings.fetch(film.localized_title, Rating.null)
+    @ratings.fetch(film.localized_title, VoCinema::Rating.null)
   end
 
   def spanish_original?(film)
@@ -84,13 +82,19 @@ class Outbox
   end
 end
 
-# Builds a screening the way a provider would have reported it.
+# Builds the domain objects a test needs, the way the real thing would.
 module Screenings
   def screening(film, on:, at:, original_version: true)
-    ScreeningSession.new(film: film, date: on, starts_at: at, original_version?: original_version)
+    VoCinema::ScreeningSession.new(film: film, date: on, starts_at: at, original_version?: original_version)
   end
 
   def film(localized_title, year: nil)
-    Film.new(localized_title: localized_title, year: year)
+    VoCinema::Film.new(localized_title: localized_title, year: year)
+  end
+
+  def cinema(name, sensacine_id: nil, yelmo_id: nil, url: nil, check_vo: false)
+    VoCinema::Cinema.new(
+      name: name, url: url, sensacine_id: sensacine_id, yelmo_id: yelmo_id, check_vo: check_vo
+    )
   end
 end

@@ -37,34 +37,45 @@ Each class reads its own secrets from ENV as default keyword arguments — plain
 ## Architecture
 
 ```
+Gemfile                 # zeitwerk (runtime), minitest (test)
 lib/
-  http_client.rb        # shared HTTP module (one retry, jitter) — included by clients
-  sensacine_client.rb   # fetches showtimes from SensaCine internal JSON API
-  tmdb_client.rb        # searches TMDB for original title + rating
-  telegram_messenger.rb # sends message via Telegram Bot API
-  stdout_messenger.rb   # sends message to stdout (dev/testing)
-  film.rb               # mutable PORO: localized_title + year always set; title filled after TMDB lookup
-  screening_session.rb  # Data.define: film, date, starts_at, original_version?; #slot identifies a screening across providers
-  rating.rb             # Data.define with .null sentinel; to_s/to_str safe for string interpolation
-  yelmo_client.rb       # authoritative VO source for Yelmo Ocimax Gijón
-  cinema_listing.rb     # Data.define: one cinema's week, enriched and ready to print
-  digest_renderer.rb    # pure: turns listings into the Telegram message
-  timetable.rb          # pure: one film's week, grouped by day and aligned into a column
-  weekly_notifier.rb    # orchestrator: collect → enrich → render → send
+  vo_cinema.rb          # sets up Zeitwerk; the only require_relative in the project
+  vo_cinema/
+    cinema.rb           # Data.define: one venue as config/cinemas.yml describes it
+    film.rb             # mutable PORO: localized_title + year always set; title filled after TMDB
+    rating.rb           # Data.define with .null sentinel; to_s/to_str safe for interpolation
+    screening_session.rb# Data.define: film, date, starts_at, original_version?; #slot identifies a screening
+    cinema_listing.rb   # Data.define: one cinema's week, enriched and ready to print
+    weekly_notifier.rb  # orchestrator: collect → enrich → render → send
+    http/
+      client.rb         # the only code that touches the network: retry, pacing, shared headers
+    showtimes/
+      sensacine.rb      # fetches a theatre-day, follows pagination
+      sensacine/day.rb  # reads one day's payload into ScreeningSessions
+      yelmo.rb          # fetches a city once, caches it
+      yelmo/listing.rb  # reads one cinema's payload into ScreeningSessions by day
+    movies/
+      tmdb.rb           # original title, rating, and whether a film is a Spanish production
+    digest/
+      renderer.rb       # pure: turns listings into the Telegram message
+      timetable.rb      # pure: one film's week, grouped by day and aligned into a column
+    messengers/
+      telegram.rb       # posts the digest; owns Telegram's length limit
+      stdout.rb         # prints the digest; strips the markup a terminal cannot use
 bin/
-  run.rb                # thin entry point: four plain .new calls
+  run.rb                # thin entry point
   diagnose.rb           # token health check + live SensaCine probe
   capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
-config/cinemas.yml      # user-editable cinema list (name, SensaCine ID, url, check_vo flag)
+config/cinemas.yml      # user-editable cinema list (name, provider ids, url, check_vo flag)
 .mise.toml              # Ruby version (3.3) pinned for mise
-test.rb                 # entry point: inline Gemfile, then loads test/
+test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
 test/
   support/              # FakeHttp, fixtures loader, digest reader, fakes
   fixtures/             # real captured provider payloads (see its README)
-  *_test.rb             # one file per class, plus end_to_end_test.rb
+  **/*_test.rb          # mirrors lib/, plus end_to_end_test.rb
 .github/workflows/
-  test.yml              # runs ruby test.rb on every push and PR
-  rubycritic.yml        # code quality gate on lib/ (minimum score 87)
+  test.yml              # runs ruby test.rb on every pull request and on master
+  rubycritic.yml        # code quality gate on lib/ (minimum score 91)
   weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
@@ -72,18 +83,36 @@ test/
 
 ### Naming conventions
 
-- `*Client` — queries an external API (`SensacineClient`, `TmdbClient`)
-- `*Messenger` — delivers output (`TelegramMessenger`, `StdoutMessenger`)
-- All Clients and all Messengers share the same call site: plain `.new`. Classes with no config use `def initialize(**) = nil`.
-- Each class exposes a `DOMAIN` constant at the top for its base URL.
+- Folders name layers, and Zeitwerk maps them to namespaces: `Showtimes::`
+  providers, `Movies::` for TMDB, `Messengers::` for delivery, `Digest::` for
+  rendering, `Http::` for the network. A new class needs a file in the right
+  place and nothing else — there is no `require_relative` below `lib/vo_cinema.rb`.
+- A provider answers `sessions_for(cinema, date)`; a messenger answers
+  `send_message(text)`. Both are built with a plain `.new`.
+- Each class that talks to a service exposes a `DOMAIN` constant and its own
+  `HEADERS`, composed from `Http::Client::BROWSER`.
+- `VoCinema::Digest` deliberately shadows nothing: stdlib `::Digest` is still
+  reachable, because no file inside the namespace refers to it unqualified.
 
 ### `WeeklyNotifier` interface
 
 ```ruby
-WeeklyNotifier.new(showtimes:, movies_db:, messenger:, cinemas:).run(today: Date.today)
+VoCinema::WeeklyNotifier.new(
+  showtimes: [Showtimes::Sensacine.new, Showtimes::Yelmo.new],  # order does not matter
+  movies_db: Movies::Tmdb.new,
+  messenger: Messengers::Telegram.new,
+  cinemas:   Cinema.all
+).run(today: Date.today)
 ```
 
-Any conforming Client or Messenger can be swapped in without touching the orchestrator.
+Every provider is asked about every cinema and answers with nothing for a venue
+it does not cover — the notifier keeps no table of which provider runs what,
+because each provider reads its own id out of the `Cinema`.
+
+Where several describe the same screening they become one, and it is original
+version **if any of them said so**. The order they are listed in changes
+nothing. If a genuinely more authoritative provider ever turns up, it wants
+conciliation logic of its own rather than a privileged place in this list.
 
 ## SensaCine API
 
@@ -194,6 +223,38 @@ it. Adding a second renderer per channel was considered and rejected: with one
 real channel there is nothing to generalise over yet, and a messenger that
 adapts what it is given is far less machinery than a renderer per format.
 
+**A positive VO signal beats a negative one, whoever it comes from** — the
+providers' two claims are not equally reliable. Saying "original version" takes
+information: a bucket named for it, a `diffusionVersion` of `"ORIGINAL"`, a
+VOSE language tag. Saying "dubbed" is what a provider says when it has none,
+which is why SensaCine files Yelmo's subtitled prints that way, and why Yelmo
+labels a Spanish production `"ESPAÑOL"` when that print *is* the original. A
+negative is an absence of evidence; a positive is evidence. So
+`WeeklyNotifier#merge` unions the positives, and the whole pipeline reads the
+same way at every level — `Sensacine::Day` ORs bucket against
+`diffusionVersion`, `#collect_sessions` ORs that against TMDB's
+`spanish_original?`, and the merge ORs across providers.
+
+The cost is accepted deliberately: a dubbed screening can reach the digest on
+one provider's bad word. The box office states which print it is before anyone
+pays, and cinemas guard hard against the opposite mistake — an audience
+expecting dubbing and finding subtitles is the complaint they actually get.
+
+**Fetching is separate from reading** — each provider is two classes: one that
+makes requests (`Showtimes::Sensacine`, `Showtimes::Yelmo`) and one that turns
+a payload into `ScreeningSession`s (`Sensacine::Day`, `Yelmo::Listing`). The
+fetchers know about URLs, pagination and caching; the readers know about
+buckets, language tags and timestamps and could not make a request if they
+wanted to. That split, plus moving every socket into `Http::Client`, is what
+took `lib/` from 89.96 to 92.19 on RubyCritic.
+
+**One HTTP client, one set of manners** — `Http::Client` is the only code in
+the project that touches `Net::HTTP`. It owns the retry, the pacing between
+requests, the request logging, and `BROWSER`, the User-Agent and
+Accept-Language that both scraped endpoints demand. `bin/diagnose.rb` and
+`bin/capture_fixtures.rb` go through it too, so a probe cannot accidentally ask
+in a way the service never would.
+
 **Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
 providers, decides which screenings survive, and enriches each film;
 `DigestRenderer` turns the result into text and asks nobody anything. The
@@ -227,3 +288,35 @@ on what the digest says rather than on how it is assembled.
 **A film is compared across providers by `Film#key`** — the localized title downcased and stripped, because SensaCine and Yelmo disagree about capitals and stray spaces. `ScreeningSession#slot` (`[date, starts_at, film.key]`) is built on it and is what `WeeklyNotifier#merge_sessions` groups by. Note that `Film#==` is stricter: it counts the year too, so `Nosferatu` 1922 and 2024 stay two films.
 
 **`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+
+## Known gaps
+
+Recorded rather than fixed, with enough context to pick up cold.
+
+**Identify a film canonically, not by its title.** `ScreeningSession#slot`
+matches providers on `[date, starts_at, film.key]`, and `key` is the localized
+title downcased and stripped. Providers spell the same film differently —
+Ocimax's Harry Potter is `"Harry Potter y la Piedra Filosofal"` on SensaCine
+and `"Harry Potter y la Piedra Filosofal 25 Aniversario"` on Yelmo — so those
+records never group, and the VO union never fires for them. The screening still
+reaches the digest under Yelmo's name, so nothing is lost today, but the
+reconciliation is narrower than it looks. Many providers carry the IMDB id as a
+universal canonical identifier and TMDB exposes it too; what each of *our*
+providers actually exposes needs research before committing to one.
+
+**Reconcile the spelling of a film's title.** Once two records do group, the
+digest prints whichever provider's spelling won — `key` ignores case and
+surrounding space, so `"La Sustancia"` and `"La sustancia"` are the same film
+but only one of them prints. `WeeklyNotifier#agreed` currently takes the first
+record's film, which makes it a function of list order in the one place order
+still shows. It wants a rule of its own: TMDB's spelling, or the most common,
+or the shortest.
+
+**Log how often the providers disagree.** With the union rule a provider that
+quietly stops tagging VO is invisible: the others carry, and the digest just
+gets thinner. Ocimax is described by two independent providers, which makes
+their disagreement rate a free drift detector — count the slots where they
+differ on `original_version?` and print it once per run. A stable rate means
+both are healthy; a jump, or a collapse to zero, means one of them has changed
+shape. This belongs in the run log, not in the Telegram digest: provider health
+is not something a subscriber should have to read about.

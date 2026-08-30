@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "date"
-require_relative "../lib/weekly_notifier"
 
 # WeeklyNotifier is the whole service in one object: it walks the coming week
 # cinema by cinema, asks TMDB what each film is really called and how it is
@@ -14,41 +13,38 @@ class WeeklyNotifierTest < ServiceTest
 
   MONDAY = Date.new(2026, 8, 31)
 
-  OCIMAX = {
-    "name"     => "Yelmo Cines Ocimax Gijón",
-    "id"       => "E0628",
-    "url"      => "https://yelmocines.es/cartelera/asturias/ocimax-gijon",
-    "check_vo" => true
-  }.freeze
+  OCIMAX = Cinema.new(
+    name: "Yelmo Cines Ocimax Gijón", sensacine_id: "E0628", yelmo_id: nil,
+    url: "https://yelmocines.es/cartelera/asturias/ocimax-gijon", check_vo: true
+  )
 
-  LABORAL = {
-    "name" => "Teatro de la Laboral (Laboral Cinemateca)",
-    "id"   => "G02A3",
-    "url"  => "https://www.laboralcinemateca.es/en/venta-de-entradas"
-  }.freeze
+  LABORAL = Cinema.new(
+    name: "Teatro de la Laboral (Laboral Cinemateca)", sensacine_id: "G02A3", yelmo_id: nil,
+    url: "https://www.laboralcinemateca.es/en/venta-de-entradas", check_vo: false
+  )
 
   def test_it_asks_every_cinema_about_the_coming_seven_days
-    listings = Listings.new("E0628" => [], "G02A3" => [])
+    listings = Listings.new("Yelmo Cines Ocimax Gijón" => [], "Teatro de la Laboral (Laboral Cinemateca)" => [])
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: Outbox.new, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 
     assert_equal ["2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03",
                   "2026-09-04", "2026-09-05", "2026-09-06"],
-                 listings.days_asked_about.select { |theater, _| theater == "E0628" }.map(&:last)
-    assert_equal 7, listings.days_asked_about.count { |theater, _| theater == "G02A3" }
+                 listings.days_asked_about.select { |theater, _| theater == "Yelmo Cines Ocimax Gijón" }.map(&:last)
+    assert_equal 7, listings.days_asked_about.count { |theater, _| theater == "Teatro de la Laboral (Laboral Cinemateca)" }
   end
 
   def test_a_film_is_listed_once_with_all_of_its_showtimes
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [
       screening(substance, on: "2026-09-04", at: "19:30"),
       screening(substance, on: "2026-09-05", at: "18:00"),
       screening(substance, on: "2026-09-05", at: "21:45")
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_equal ["18:00", "19:30", "21:45"], outbox.digest.times_listed_for("La sustancia").sort
@@ -59,14 +55,14 @@ class WeeklyNotifierTest < ServiceTest
     # Two screens can run the same film at the same minute; the digest is a
     # list of when you could go, not of how many seats exist.
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [
       screening(substance, on: "2026-09-04", at: "21:45"),
       screening(substance, on: "2026-09-04", at: "18:00"),
       screening(substance, on: "2026-09-04", at: "21:45")
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_equal ["18:00", "21:45"], outbox.digest.times_listed_for("La sustancia")
@@ -74,13 +70,13 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_each_day_of_the_week_is_named
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [
       screening(substance, on: "2026-09-04", at: "19:30"),
       screening(substance, on: "2026-09-05", at: "18:00")
     ])
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
     block = outbox.digest.block_about("La sustancia")
 
@@ -95,7 +91,7 @@ class WeeklyNotifierTest < ServiceTest
     all_week = (0..6).map { |offset| screening(tadeo, on: (MONDAY + offset).to_s, at: "18:10") }
     outbox   = Outbox.new
 
-    WeeklyNotifier.new(showtimes: Listings.new("E0628" => all_week), movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [Listings.new("Yelmo Cines Ocimax Gijón" => all_week)], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [OCIMAX]).run(today: MONDAY)
     block = outbox.digest.block_about("Tadeo Jones")
 
@@ -107,11 +103,11 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_the_original_title_is_shown_next_to_the_spanish_one
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")])
     tmdb      = MovieDatabase.new(original_titles: { "La sustancia" => "The Substance" })
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("La sustancia")
@@ -120,11 +116,11 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_a_film_that_was_never_renamed_is_not_given_its_own_title_twice
     querido  = film("El ser querido", year: 2026)
-    listings = Listings.new("G02A3" => [screening(querido, on: "2026-09-04", at: "19:00")])
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(querido, on: "2026-09-04", at: "19:00")])
     tmdb     = MovieDatabase.new(original_titles: { "El ser querido" => "El ser querido" })
     outbox   = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_equal 1, outbox.digest.text.scan("El ser querido").length
@@ -132,11 +128,11 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_a_rated_film_is_shown_with_its_score
     potter   = film("Harry Potter y la Piedra Filosofal", year: 2001)
-    listings = Listings.new("G02A3" => [screening(potter, on: "2026-09-04", at: "17:00")])
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(potter, on: "2026-09-04", at: "17:00")])
     tmdb     = MovieDatabase.new(ratings: { "Harry Potter y la Piedra Filosofal" => Rating.new(score: 7.903) })
     outbox   = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: tmdb,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_includes outbox.digest.block_about("Harry Potter"), "7.9"
@@ -145,10 +141,10 @@ class WeeklyNotifierTest < ServiceTest
   def test_a_film_tmdb_would_not_commit_on_is_listed_with_no_score_and_no_gap
     # Rating.null renders as nothing at all, so the title line just ends.
     obscure  = film("Ciclo Buñuel: presentación")
-    listings = Listings.new("G02A3" => [screening(obscure, on: "2026-09-04", at: "20:00")])
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(obscure, on: "2026-09-04", at: "20:00")])
     outbox   = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
     headline = outbox.digest.block_about("Ciclo Buñuel").lines.first.chomp
 
@@ -160,10 +156,10 @@ class WeeklyNotifierTest < ServiceTest
     # always the rest of today. Saying so is what stops a reader concluding
     # that a film they can still catch tomorrow was not on at all.
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("still to come")
@@ -173,11 +169,11 @@ class WeeklyNotifierTest < ServiceTest
     # "no sessions" would be a claim neither provider ever makes: an empty
     # answer means nothing is left to book, not that nothing was programmed.
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")],
-                             "E0628" => [])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")],
+                             "Yelmo Cines Ocimax Gijón" => [])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("Nothing left to catch this week at: Yelmo Cines Ocimax Gijón")
@@ -186,11 +182,11 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_a_venue_with_nothing_on_is_named_once_instead_of_given_a_section
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")],
-                             "E0628" => [])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")],
+                             "Yelmo Cines Ocimax Gijón" => [])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("Yelmo Cines Ocimax Gijón")
@@ -200,22 +196,22 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_a_cinema_heading_links_to_the_venue_s_own_page
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_includes outbox.digest.links, "https://www.laboralcinemateca.es/en/venta-de-entradas"
   end
 
   def test_a_cinema_with_no_page_of_its_own_still_gets_a_heading
-    ateneo    = { "name" => "Centro Municipal Integrado Ateneo de La Calzada", "id" => "G02D6" }
+    ateneo    = cinema("Centro Municipal Integrado Ateneo de La Calzada", sensacine_id: "G02D6")
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02D6" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    listings  = Listings.new("Centro Municipal Integrado Ateneo de La Calzada" => [screening(substance, on: "2026-09-04", at: "19:30")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [ateneo]).run(today: MONDAY)
 
     assert outbox.digest.mentions?("Centro Municipal Integrado Ateneo de La Calzada")
@@ -224,10 +220,10 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_a_cinema_heading_covers_the_week_being_reported
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("G02A3" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
     heading = outbox.digest.block_about("Teatro de la Laboral")
 
@@ -238,11 +234,11 @@ class WeeklyNotifierTest < ServiceTest
   def test_cinemas_appear_in_the_order_they_are_configured
     substance = film("La sustancia", year: 2024)
     potter    = film("Harry Potter y la Piedra Filosofal", year: 2001)
-    listings  = Listings.new("E0628" => [screening(substance, on: "2026-09-04", at: "19:30")],
-                             "G02A3" => [screening(potter, on: "2026-09-04", at: "17:00")])
+    listings  = Listings.new("Yelmo Cines Ocimax Gijón" => [screening(substance, on: "2026-09-04", at: "19:30")],
+                             "Teatro de la Laboral (Laboral Cinemateca)" => [screening(potter, on: "2026-09-04", at: "17:00")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
     text = outbox.digest.text
 
@@ -251,11 +247,11 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_the_whole_week_arrives_as_a_single_message
     substance = film("La sustancia", year: 2024)
-    listings  = Listings.new("E0628" => [screening(substance, on: "2026-09-04", at: "19:30")],
-                             "G02A3" => [screening(substance, on: "2026-09-05", at: "17:00")])
+    listings  = Listings.new("Yelmo Cines Ocimax Gijón" => [screening(substance, on: "2026-09-04", at: "19:30")],
+                             "Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-05", at: "17:00")])
     outbox    = Outbox.new
 
-    WeeklyNotifier.new(showtimes: listings, movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 
     assert_equal 1, outbox.messages.length
@@ -263,7 +259,7 @@ class WeeklyNotifierTest < ServiceTest
 
   def test_an_unusually_busy_week_is_handed_over_whole
     # The notifier does not shorten anything. Telegram's 4096-character limit
-    # is Telegram's, and TelegramMessenger enforces it; a messenger writing to
+    # is Telegram's, and Messengers::Telegram enforces it; a messenger writing to
     # a terminal has no such limit and should get the lot.
     crowded_week = (1..60).flat_map do |n|
       title = film("Película número #{n} del ciclo de verano", year: 2026)
@@ -271,7 +267,7 @@ class WeeklyNotifierTest < ServiceTest
     end
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: Listings.new("G02A3" => crowded_week), movies_db: MovieDatabase.new,
+    WeeklyNotifier.new(showtimes: [Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => crowded_week)], movies_db: MovieDatabase.new,
                        messenger: outbox, cinemas: [LABORAL]).run(today: MONDAY)
 
     assert_operator outbox.messages.first.length, :>, 4096
@@ -284,7 +280,7 @@ class WeeklyNotifierTest < ServiceTest
     # Silence would be indistinguishable from a broken cron job.
     outbox = Outbox.new
 
-    WeeklyNotifier.new(showtimes: Listings.new("E0628" => [], "G02A3" => []),
+    WeeklyNotifier.new(showtimes: [Listings.new("Yelmo Cines Ocimax Gijón" => [], "Teatro de la Laboral (Laboral Cinemateca)" => [])],
                        movies_db: MovieDatabase.new, messenger: outbox,
                        cinemas: [OCIMAX, LABORAL]).run(today: MONDAY)
 

@@ -12,21 +12,19 @@
 # verbatim, and a key inventory is printed alongside so it is obvious what was
 # left out.
 
-require "net/http"
+require "bundler/setup"
 require "json"
-require "uri"
 require "date"
-require "yaml"
+require_relative "../lib/vo_cinema"
 
 DROPPED_KEYS  = %w[synopsis synopsis_json poster credits cast videos trailer
                    editorialReviews relatedTags stats customJson Poster
                    PosterUrl TrailerUrl Synopsis Description].freeze
 MAX_STRING    = 120
-CINEMAS       = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"].freeze
+CINEMAS       = VoCinema::Cinema.all.freeze
 # Set PROVIDER to sensacine, yelmo or tmdb to capture just that one; the job
 # log for a single provider is short enough to read end to end.
 PROVIDER      = (ENV["PROVIDER"] || "all").downcase
-SENSACINE_UA  = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 DAYS          = 7
 
 def section(title) = puts("\n\n########## #{title} ##########\n")
@@ -50,18 +48,11 @@ def prune(value)
   end
 end
 
-def http_get(url, headers = {})
-  uri = URI(url)
-  req = Net::HTTP::Get.new(uri, headers)
-  Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 15) { |h| h.request(req) }
-end
-
-def http_post(url, body, headers = {})
-  uri      = URI(url)
-  req      = Net::HTTP::Post.new(uri, headers)
-  req.body = body
-  Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 15) { |h| h.request(req) }
-end
+# Every request goes through the service's own client, with the service's own
+# headers: a payload captured here is one the notifier could really have got.
+def sensacine_http = @sensacine_http ||= VoCinema::Http::Client.new(headers: VoCinema::Showtimes::Sensacine::HEADERS)
+def yelmo_http     = @yelmo_http     ||= VoCinema::Http::Client.new(headers: VoCinema::Showtimes::Yelmo::HEADERS)
+def tmdb_http      = @tmdb_http      ||= VoCinema::Http::Client.new
 
 def parse_json(resp)
   JSON.parse(resp.body)
@@ -74,13 +65,6 @@ end
 if capturing?("sensacine")
 section "SensaCine — every cinema, next #{DAYS} days"
 
-SENSACINE_HEADERS = {
-  "User-Agent"      => SENSACINE_UA,
-  "Accept"          => "application/json",
-  "Accept-Language" => "es-ES,es;q=0.9",
-  "Referer"         => "https://www.sensacine.com/cines/cine/"
-}.freeze
-
 empty_day_body   = nil
 sample_day       = nil
 vo_entries       = []
@@ -90,13 +74,12 @@ diffusion_values = Hash.new(0)
 bucket_totals    = Hash.new(0)
 
 CINEMAS.each do |cinema|
-  puts "\n--- #{cinema["name"]} (id=#{cinema["id"]}) ---"
+  puts "\n--- #{cinema.name} (id=#{cinema.sensacine_id}) ---"
 
   DAYS.times do |offset|
     date = (Date.today + offset).to_s
-    url  = "https://www.sensacine.com/_/showtimes/theater-#{cinema["id"]}/d-#{date}/"
-    resp = http_get(url, SENSACINE_HEADERS)
-    sleep 0.3
+    url  = "#{VoCinema::Showtimes::Sensacine::DOMAIN}/_/showtimes/theater-#{cinema.sensacine_id}/d-#{date}/"
+    resp = sensacine_http.get(url)
 
     unless resp.code == "200"
       puts "  #{date}  HTTP #{resp.code}"
@@ -129,9 +112,9 @@ CINEMAS.each do |cinema|
 
       films_seen << "#{entry.dig("movie", "title")} #{buckets.transform_values(&:length).inspect}"
 
-      sample_day ||= { cinema: cinema["name"], date: date, body: parsed }
+      sample_day ||= { cinema: cinema.name, date: date, body: parsed }
       if buckets.keys.any? { |bucket| bucket.start_with?("original", "local") }
-        vo_entries << { cinema: cinema["name"], date: date, entry: entry }
+        vo_entries << { cinema: cinema.name, date: date, entry: entry }
       end
     end
 
@@ -167,18 +150,9 @@ end
 if capturing?("yelmo")
 section "Yelmo — GetNowPlaying for Asturias"
 
-YELMO_HEADERS = {
-  "Content-Type"     => "application/json; charset=UTF-8",
-  "X-Requested-With" => "XMLHttpRequest",
-  "Accept"           => "application/json, text/javascript, */*; q=0.01",
-  "Referer"          => "https://www.yelmocines.es/cartelera",
-  "User-Agent"       => SENSACINE_UA
-}.freeze
-
-yelmo_resp = http_post(
-  "https://www.yelmocines.es/now-playing.aspx/GetNowPlaying",
-  JSON.generate({ cityKey: "asturias" }),
-  YELMO_HEADERS
+yelmo_resp = yelmo_http.post(
+  "#{VoCinema::Showtimes::Yelmo::DOMAIN}/now-playing.aspx/GetNowPlaying",
+  JSON.generate({ cityKey: "asturias" })
 )
 puts "HTTP #{yelmo_resp.code}"
 
@@ -224,8 +198,7 @@ else
     ["Tadeo Jones y la lámpara maravillosa", 2026, "search_tadeo_jones.json"]
   ].each do |title, year, fixture|
     query = URI.encode_www_form(query: title, language: "es-ES", api_key: tmdb_key)
-    resp  = http_get("https://api.themoviedb.org/3/search/movie?#{query}&year=#{year}")
-    sleep 0.3
+    resp  = tmdb_http.get("#{VoCinema::Movies::Tmdb::DOMAIN}/3/search/movie?#{query}&year=#{year}")
     puts "\n#{title} (#{year}) → HTTP #{resp.code}"
     next unless resp.code == "200"
 

@@ -10,6 +10,7 @@ Install [mise](https://mise.jdx.dev) to manage Ruby versions and environment var
 
 ```bash
 mise install
+bundle install
 ruby test.rb         # run tests
 ruby bin/run.rb      # run the notifier
 ```

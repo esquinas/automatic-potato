@@ -1,19 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "yaml"
-require_relative "../lib/sensacine_client"
-require_relative "../lib/yelmo_client"
-require_relative "../lib/tmdb_client"
-require_relative "../lib/telegram_messenger"
-require_relative "../lib/weekly_notifier"
+require "bundler/setup"
+require_relative "../lib/vo_cinema"
 
-CINEMAS = YAML.load_file(File.join(__dir__, "..", "config", "cinemas.yml"))["cinemas"].freeze
-
-WeeklyNotifier.new(
-  showtimes:       SensacineClient.new,
-  yelmo_showtimes: YelmoClient.new,
-  movies_db:       TmdbClient.new,
-  messenger:       TelegramMessenger.new,
-  cinemas:         CINEMAS
+# Providers run least to most authoritative: SensaCine lists every cinema in
+# Gijón, and Yelmo is believed over it about its own.
+VoCinema::WeeklyNotifier.new(
+  showtimes: [VoCinema::Showtimes::Sensacine.new, VoCinema::Showtimes::Yelmo.new],
+  movies_db: VoCinema::Movies::Tmdb.new,
+  messenger: VoCinema::Messengers::Telegram.new,
+  cinemas:   VoCinema::Cinema.all
 ).run

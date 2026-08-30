@@ -2,20 +2,18 @@
 
 require "json"
 require "uri"
-require_relative "../lib/tmdb_client"
-require_relative "../lib/film"
 
-# TmdbClient answers three questions about a film the cinemas only named in
+# Movies::Tmdb answers three questions about a film the cinemas only named in
 # Spanish: what is it called originally, how is it rated, and was it made in
 # Spanish in the first place.
 #
 # It is deliberately shy about ratings. A wrong star next to a film is worse
 # than no star, so anything that looks like a doubtful match comes back as
 # Rating.null and the digest simply says nothing.
-class TmdbClientTest < ServiceTest
+class TmdbTest < ServiceTest
   def setup
     @http   = FakeHttp.new
-    @client = TmdbClient.new(api_key: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d")
+    @client = Movies::Tmdb.new(api_key: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d")
   end
 
   def answering_with(fixture)
@@ -54,7 +52,7 @@ class TmdbClientTest < ServiceTest
     ENV["TMDB_API_KEY"] = "key-from-the-environment"
 
     answering_with("tmdb/search_la_sustancia.json")
-    asking { TmdbClient.new.fetch_original_title(Film.new(localized_title: "La sustancia", year: 2024)) }
+    asking { Movies::Tmdb.new.fetch_original_title(Film.new(localized_title: "La sustancia", year: 2024)) }
     query = URI.decode_www_form(URI(@http.requests.first.url).query).to_h
 
     assert_equal "key-from-the-environment", query["api_key"]

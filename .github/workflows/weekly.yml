@@ -39,6 +39,7 @@ jobs:
         if: steps.clock.outputs.send == 'true'
         with:
           ruby-version: "3.3"
+          bundler-cache: true
 
       - name: Send notification
         if: steps.clock.outputs.send == 'true'

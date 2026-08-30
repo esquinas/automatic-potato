@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/telegram_messenger"
 
 # The last step: hand the finished digest to the Telegram Bot API.
-class TelegramMessengerTest < ServiceTest
+class TelegramTest < ServiceTest
   # What Telegram sends back when a message goes out.
   DELIVERED = JSON.generate(
     "ok" => true,
@@ -24,7 +23,7 @@ class TelegramMessengerTest < ServiceTest
   end
 
   def deliver(text, token: "7842115903:AAH2-fake-token-for-tests", chat_id: "-1001234567890")
-    @http.while_intercepting { TelegramMessenger.new(token: token, chat_id: chat_id).send_message(text) }
+    @http.while_intercepting { Messengers::Telegram.new(token: token, chat_id: chat_id).send_message(text) }
   end
 
   def test_the_digest_is_posted_to_the_bot_s_own_send_message_endpoint
@@ -93,7 +92,7 @@ class TelegramMessengerTest < ServiceTest
     ENV["TELEGRAM_BOT_TOKEN"] = "token-from-the-environment"
     ENV["TELEGRAM_CHAT_ID"]   = "-1005554443332"
 
-    @http.while_intercepting { TelegramMessenger.new.send_message("hola") }
+    @http.while_intercepting { Messengers::Telegram.new.send_message("hola") }
     payload = JSON.parse(@http.requests.first.body)
 
     assert_includes @http.requests.first.url, "bottoken-from-the-environment/"
