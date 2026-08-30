@@ -300,9 +300,9 @@ Ocimax's Harry Potter is `"Harry Potter y la Piedra Filosofal"` on SensaCine
 and `"Harry Potter y la Piedra Filosofal 25 Aniversario"` on Yelmo — so those
 records never group, and the VO union never fires for them. The screening still
 reaches the digest under Yelmo's name, so nothing is lost today, but the
-reconciliation is narrower than it looks. Many providers carry the IMDB id as a
-universal canonical identifier and TMDB exposes it too; what each of *our*
-providers actually exposes needs research before committing to one.
+reconciliation is narrower than it looks. TMDB is the only party that sees both
+spellings, so its `id` is the identifier available to us; whether its search
+really resolves both to one id is what `bin/probe_identity.rb` asks.
 
 **Reconcile the spelling of a film's title.** Once two records do group, the
 digest prints whichever provider's spelling won — `key` ignores case and
