@@ -30,11 +30,22 @@ module VoCinema
           (day["Movies"] || []).flat_map { |movie| screenings_of(movie, date) }
         end
 
+        # A film Movie could not name is dropped, whatever formats it carries.
         def screenings_of(movie, date)
-          film = Film.new(localized_title: movie["Title"] || "(untitled)", year: nil)
+          film = Movie.new(movie).film
+          return [] unless film
 
-          (movie["Formats"] || []).flat_map { |format| times_in(format).map { |time| screening(film, date, time, format) } }
+          formats = movie["Formats"] || []
+
+          formats.flat_map { |format| screenings_in_format(film, date, format) }
         end
+
+        # A film is offered in several formats and each has its own list of
+        # times, so one film's day is two levels deep.
+        def screenings_in_format(film, date, format)
+          times_in(format).map { |time| screening(film, date, time, format) }
+        end
+
 
         def times_in(format) = (format["Showtimes"] || []).filter_map { |showtime| showtime["Time"]&.slice(0, 5) }
 

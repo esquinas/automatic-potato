@@ -111,7 +111,27 @@
           "isPremiere": false,
           "weeklyOuting": true
         },
-        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…"
+        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…",
+        "credits": [
+          {
+            "person": {
+              "__typename": "Person",
+              "internalId": 258,
+              "lastName": "Scott",
+              "firstName": "Ridley",
+              "seo": {
+                "__typename": "Seo",
+                "browsable": true
+              }
+            },
+            "position": {
+              "__typename": "Position",
+              "name": "DIRECTOR",
+              "department": "DIRECTION"
+            },
+            "rank": 1
+          }
+        ]
       },
       "showtimes": {
         "local": [
@@ -331,7 +351,27 @@
           "isPremiere": false,
           "weeklyOuting": true
         },
-        "synopsisFull": "<p class=\"bo-p\">Tadeo y Sara disfrutan ahora de la vida como padres de Olimpia (Oli), una niña de dos años llena de curi…"
+        "synopsisFull": "<p class=\"bo-p\">Tadeo y Sara disfrutan ahora de la vida como padres de Olimpia (Oli), una niña de dos años llena de curi…",
+        "credits": [
+          {
+            "person": {
+              "__typename": "Person",
+              "internalId": 141850,
+              "lastName": "Gato",
+              "firstName": "Enrique",
+              "seo": {
+                "__typename": "Seo",
+                "browsable": true
+              }
+            },
+            "position": {
+              "__typename": "Position",
+              "name": "DIRECTOR",
+              "department": "DIRECTION"
+            },
+            "rank": 1
+          }
+        ]
       },
       "showtimes": {
         "local": [

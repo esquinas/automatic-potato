@@ -17,7 +17,7 @@ require "json"
 require "date"
 require_relative "../lib/vo_cinema"
 
-DROPPED_KEYS  = %w[synopsis synopsis_json poster credits cast videos trailer
+DROPPED_KEYS  = %w[synopsis synopsis_json poster cast videos trailer
                    editorialReviews relatedTags stats customJson Poster
                    PosterUrl TrailerUrl Synopsis Description].freeze
 MAX_STRING    = 120
@@ -41,11 +41,26 @@ end
 
 def prune(value)
   case value
-  when Hash   then value.reject { |k, _| DROPPED_KEYS.include?(k) }.transform_values { |v| prune(v) }
+  when Hash   then prune_hash(value)
   when Array  then value.map { |v| prune(v) }
   when String then value.length > MAX_STRING ? "#{value[0, MAX_STRING]}…" : value
   else value
   end
+end
+
+def prune_hash(hash)
+  kept = hash.reject { |key, _| DROPPED_KEYS.include?(key) }
+  kept = kept.merge("credits" => directors_in(kept["credits"])) if kept.key?("credits")
+
+  kept.transform_values { |value| prune(value) }
+end
+
+# credits lists the whole crew, and only the director is ever read — Yelmo
+# publishes one too, which is what lets the two providers be matched on it.
+# Keeping the rest would bury the fixture; dropping the lot, as this used to,
+# left no fixture able to show the field the matching depends on.
+def directors_in(credits)
+  Array(credits).select { |credit| credit.dig("position", "name") == "DIRECTOR" }
 end
 
 # Every request goes through the service's own client, with the service's own

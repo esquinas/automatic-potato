@@ -88,8 +88,8 @@ module Screenings
     VoCinema::ScreeningSession.new(film: film, date: on, starts_at: at, original_version?: original_version)
   end
 
-  def film(localized_title, year: nil)
-    VoCinema::Film.new(localized_title: localized_title, year: year)
+  def film(localized_title, year: nil, director: nil)
+    VoCinema::Film.new(localized_title: localized_title, year: year, director: director)
   end
 
   def cinema(name, sensacine_id: nil, yelmo_id: nil, url: nil, check_vo: false)

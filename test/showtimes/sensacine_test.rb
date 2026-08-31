@@ -223,6 +223,41 @@ class SensacineTest < ServiceTest
     assert_nil dog_stars.film.year
   end
 
+  def test_a_film_carries_the_director_the_feed_credits
+    # The one field both providers publish, which is what lets a film billed
+    # two different ways be recognised as one. SensaCine files it in a flat
+    # credits list where every entry is tagged with the job it did.
+    potter = find_session(laboral_sessions, "Harry Potter y la Piedra Filosofal", "17:00")
+
+    assert_equal "Chris Columbus", potter.film.director
+  end
+
+  def test_a_film_whose_credits_name_nobody_as_director_simply_has_none
+    # A film with no director cannot be matched on one — it falls back to being
+    # recognised by its title alone, which is what every film did before this.
+    feed = Fixtures.parse("sensacine/ocimax_all_dubbed.json")
+    feed["results"][0]["movie"]["credits"] = []
+    @http.answers "sensacine.com", body: JSON.generate(feed)
+
+    dog_stars = find_session(sessions_on("2026-08-28"), "La constelación del perro", "18:45")
+
+    assert_nil dog_stars.film.director
+  end
+
+  def test_an_entry_the_feed_does_not_name_is_not_a_film
+    # The André Rieu concert reaches Ocimax with no movie.title at all. It used
+    # to become a film called "(untitled)", which TMDB answered with "Untitled
+    # Immaculate Reception Film" — so a concert would have reached subscribers
+    # under a stranger's name. Yelmo lists the same screening properly named.
+    feed = Fixtures.parse("sensacine/ocimax_all_dubbed.json")
+    feed["results"][0]["movie"].delete("title")
+    @http.answers "sensacine.com", body: JSON.generate(feed)
+
+    sessions = sessions_on("2026-08-28")
+
+    assert_equal ["Tadeo Jones y la lámpara maravillosa"], sessions.map { |s| s.film.localized_title }.uniq
+  end
+
   private
 
   def laboral_sessions

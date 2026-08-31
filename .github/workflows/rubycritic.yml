@@ -23,9 +23,16 @@ jobs:
       - name: Install RubyCritic
         run: gem install rubycritic
 
-      # lib/ scores 89.98 as of the Timetable extraction and the HttpClient
-      # merge. The gate sits about two points under that on purpose: tight
-      # enough to catch real decay, loose enough that an ordinary addition does
-      # not turn CI red and train the next person to lower the number.
+      # lib/ scores 92.34 as of the Movie readers. The gate is the number in
+      # the flag below and nowhere else — keep any prose about it in sync, or
+      # the next person reads a stale figure and thinks they have room they do
+      # not have. It sits just under the real score on purpose: tight enough to
+      # catch real decay, loose enough that an ordinary addition does not turn
+      # CI red and train the next person to lower the number.
+      #
+      # RubyCritic rates a file mostly on complexity, and the A/B line falls
+      # near 50: what moves the score is splitting a file that does two jobs,
+      # not chasing individual smells. Flog multiplies nested blocks, so a
+      # block inside a block costs far more than the same work side by side.
       - name: Run RubyCritic
         run: rubycritic --minimum-score 92 --format console --no-browser lib

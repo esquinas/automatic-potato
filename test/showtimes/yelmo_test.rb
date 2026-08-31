@@ -115,7 +115,48 @@ class YelmoTest < ServiceTest
     assert_empty sessions
   end
 
+  def test_a_film_carries_the_director_yelmo_publishes
+    # Yelmo names a director per film, in the same words SensaCine credits —
+    # which is what lets the same film billed two ways be recognised as one.
+    potter = find_session(sessions_on("2026-08-29"), "Harry Potter", "17:00")
+
+    assert_equal "Chris Columbus", potter.film.director
+  end
+
+  def test_a_film_yelmo_credits_to_nobody_simply_has_no_director
+    # A film with no director cannot be matched on one, and falls back to being
+    # recognised by its title alone.
+    sessions = sessions_from_a_payload_where { |movie| movie["Director"] = "" }
+
+    assert(sessions.any? { |session| session.film.director.nil? },
+           "expected the film with an empty Director to carry none")
+  end
+
+  def test_an_unnamed_film_is_not_a_film
+    # As on SensaCine: nothing to print, nothing to look up at TMDB, and
+    # nothing to match the other provider on.
+    sessions = sessions_from_a_payload_where { |movie| movie["Title"] = "" }
+    titles   = sessions.map { |session| session.film.localized_title }
+
+    refute_includes titles, ""
+    refute_includes titles, "Harry Potter y la Piedra Filosofal 25 Aniversario"
+  end
+
   private
+
+  # A payload with the first film on 29 August altered. It needs a FakeHttp of
+  # its own: setup has already answered for yelmocines.es, and the first
+  # matcher registered is the one that answers.
+  def sessions_from_a_payload_where
+    payload = Fixtures.parse("yelmo/now_playing_asturias.json")
+    yield payload["d"]["Cinemas"][0]["Dates"][0]["Movies"][0]
+
+    http   = FakeHttp.new
+    client = Showtimes::Yelmo.new(http: Http::Client.new(headers: Showtimes::Yelmo::HEADERS))
+    http.answers "yelmocines.es", body: JSON.generate(payload)
+
+    http.while_intercepting { client.sessions_for(cinema("Ocimax", yelmo_id: OCIMAX_GIJON), "2026-08-29") }
+  end
 
   def find_session(sessions, title_fragment, starts_at)
     sessions.find { |s| s.film.localized_title.include?(title_fragment) && s.starts_at == starts_at } ||

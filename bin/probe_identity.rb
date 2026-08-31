@@ -1,14 +1,25 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Answers the one question canonical film identity hangs on: can TMDB recognise
-# the same film through the different names the providers give it?
+# Asks whether the director is a signal we can match films on across providers.
 #
-# Ocimax is the only cinema both providers cover, and they disagree about what
-# films are called there — SensaCine says "Harry Potter y la Piedra Filosofal"
-# where Yelmo says "…25 Aniversario". Records that spell a film differently
-# never group, so the union merge rule never fires for them. If TMDB resolves
-# both spellings to one id, that id is the identity we have been missing.
+# The first run of this probe settled the earlier question: TMDB does NOT
+# recognise an edition-suffixed title. "Harry Potter y la Piedra Filosofal 25
+# Aniversario" and "The Fast & The Furious 25 aniversario" both come back with
+# no results at all, and the one suffixed title TMDB did answer — SensaCine's
+# "The Fast and the Furious (A todo gas) - 25 Aniversario" — it answered wrongly,
+# with "Fast & Furious X" (2023). So a title alone cannot identify a film, and
+# TMDB cannot be trusted to repair one.
+#
+# The director might. Yelmo publishes a clean "Director" per film ("Chris
+# Columbus"); SensaCine publishes a "credits" array that bin/capture_fixtures.rb
+# drops, so no fixture has ever shown its shape. This probe prints both sides so
+# three things can be decided:
+#
+#   1. how the director is marked inside SensaCine's credits;
+#   2. whether the two providers spell a director's name the same way;
+#   3. whether credits are populated at all on re-releases and odd entries —
+#      the films that need the help.
 #
 # Run it through the "Capture API fixtures" workflow with provider=identity.
 # Read-only: it asks the providers and prints what they said.
@@ -16,7 +27,6 @@
 require "bundler/setup"
 require "json"
 require "date"
-require "uri"
 require_relative "../lib/vo_cinema"
 
 DAYS    = VoCinema::WeeklyNotifier::WEEK_DAYS
@@ -24,106 +34,158 @@ CINEMAS = VoCinema::Cinema.all
 
 def section(title) = puts("\n\n########## #{title} ##########\n")
 
-# The probe wants raw TMDB fields — id and release_date — that Movies::Tmdb has
-# no reason to expose, so it asks over the same client with the same query.
-def tmdb_top_match(title, year)
-  key = ENV["TMDB_API_KEY"].to_s
-  return nil if key.empty?
+def sensacine_http = @sensacine_http ||= VoCinema::Http::Client.new(headers: VoCinema::Showtimes::Sensacine::HEADERS)
+def yelmo_http     = @yelmo_http     ||= VoCinema::Http::Client.new(headers: VoCinema::Showtimes::Yelmo::HEADERS)
 
-  query  = URI.encode_www_form(query: title, language: "es-ES", api_key: key)
-  query += "&year=#{year}" if year
-  response = tmdb_http.get("#{VoCinema::Movies::Tmdb::DOMAIN}/3/search/movie?#{query}")
-  return nil unless response.code == "200"
+def parse(response) = response.code == "200" ? JSON.parse(response.body) : nil
 
-  JSON.parse(response.body)["results"].to_a.first
+# The domain objects carry title, date and time and nothing else, so the probe
+# reads the raw payloads: the director is exactly the field they drop.
+def sensacine_day(cinema, date)
+  url    = "#{VoCinema::Showtimes::Sensacine::DOMAIN}/_/showtimes/theater-#{cinema.sensacine_id}/d-#{date}/"
+  parsed = parse(sensacine_http.get(url))
+
+  parsed && !parsed["error"] ? parsed["results"].to_a : []
 end
 
-def tmdb_http = @tmdb_http ||= VoCinema::Http::Client.new
+def yelmo_city(city_key)
+  parsed = parse(yelmo_http.post(
+                   "#{VoCinema::Showtimes::Yelmo::DOMAIN}/now-playing.aspx/GetNowPlaying",
+                   JSON.generate({ cityKey: city_key })
+                 ))
+
+  parsed&.dig("d", "Cinemas") || []
+end
+
+# What a credit looks like is the open question, so this tries the shapes
+# Allociné's GraphQL is known to use and reports which one answered.
+def director_from(credits)
+  Array(credits).filter_map do |credit|
+    position = credit["position"]
+    marker   = position.is_a?(Hash) ? (position["name"] || position["department"]) : position
+    next unless marker.to_s.upcase.include?("DIRECT")
+
+    person = credit["person"] || {}
+    [person["firstName"], person["lastName"]].compact.join(" ").strip
+  end.reject(&:empty?).uniq
+end
+
+def showtimes_of(entry)
+  (entry["showtimes"] || {}).values.flatten.compact
+end
 
 # ---------------------------------------------------------------------------
-section "The week at every cinema both providers cover"
+section "Reading both providers for every cinema they both cover"
 
 shared = CINEMAS.select { |cinema| cinema.sensacine_id && cinema.yelmo_id }
 puts "Cinemas covered twice: #{shared.map(&:name).inspect}"
 
-sensacine = VoCinema::Showtimes::Sensacine.new
-yelmo     = VoCinema::Showtimes::Yelmo.new
-titles    = Hash.new { |seen, provider| seen[provider] = [] }
-overlaps  = []
+# [date, time] => { sensacine: [[title, director], ...], yelmo: [...] }
+slots           = Hash.new { |all, slot| all[slot] = { sensacine: [], yelmo: [] } }
+directors       = Hash.new { |all, provider| all[provider] = {} }
+credit_samples  = []
+missing_credits = []
 
 shared.each do |cinema|
   DAYS.times do |offset|
     date = (Date.today + offset).to_s
-    from_sensacine = sensacine.sessions_for(cinema, date)
-    from_yelmo     = yelmo.sessions_for(cinema, date)
 
-    titles[:sensacine].concat(from_sensacine.map { |s| [s.film.localized_title, s.film.year] })
-    titles[:yelmo].concat(from_yelmo.map { |s| [s.film.localized_title, s.film.year] })
+    sensacine_day(cinema, date).each do |entry|
+      movie    = entry["movie"] || {}
+      title    = movie["title"] || "(untitled)"
+      found    = director_from(movie["credits"])
+      director = found.first
 
-    from_sensacine.each do |one|
-      from_yelmo.select { |other| other.starts_at == one.starts_at }.each do |other|
-        overlaps << [date, one.starts_at, one.film.localized_title, other.film.localized_title]
+      credit_samples << [title, movie["credits"]] if credit_samples.length < 3
+      missing_credits << title if director.nil?
+      directors[:sensacine][title] = director
+
+      showtimes_of(entry).each do |showtime|
+        time = showtime["startsAt"].to_s.slice(11, 5)
+        slots[[date, time]][:sensacine] << [title, director] if time
+      end
+    end
+  end
+
+  city = cinema.yelmo_id.to_s.split("/").first
+  venue = yelmo_city(city).find { |one| one["Key"] == cinema.yelmo_id.to_s.split("/").last }
+  next unless venue
+
+  (venue["Dates"] || []).each do |day|
+    date = Time.at(day["FilterDate"].to_s[/\d+/].to_i / 1000).utc.strftime("%Y-%m-%d")
+
+    (day["Movies"] || []).each do |movie|
+      title    = movie["Title"] || "(untitled)"
+      director = movie["Director"].to_s.strip
+      director = nil if director.empty?
+      directors[:yelmo][title] = director
+
+      (movie["Formats"] || []).each do |format|
+        (format["Showtimes"] || []).each do |showtime|
+          time = showtime["Time"].to_s.slice(0, 5)
+          slots[[date, time]][:yelmo] << [title, director] unless time.empty?
+        end
       end
     end
   end
 end
 
 # ---------------------------------------------------------------------------
-section "Screenings both providers report — do they group today?"
+section "How SensaCine marks a director inside credits"
 
-puts "#{overlaps.length} slot(s) where both providers list a screening at the same minute.\n\n"
-grouped, split = overlaps.partition { |_, _, a, b| a.downcase.strip == b.downcase.strip }
-puts "  group today     : #{grouped.length}"
-puts "  fail to group   : #{split.length}   <- what canonical identity would buy\n\n"
+puts "Films with no director extracted: #{missing_credits.uniq.length} of #{directors[:sensacine].length}"
+puts "  #{missing_credits.uniq.inspect}\n\n"
 
-split.uniq { |_, _, a, b| [a, b] }.each do |date, time, from_sensacine, from_yelmo|
+credit_samples.each do |title, credits|
+  puts "--- #{title.inspect} ---"
+  puts JSON.pretty_generate(Array(credits).first(4))
+  puts
+end
+
+# ---------------------------------------------------------------------------
+section "Do the two providers name the same director?"
+
+agreed = 0
+
+directors[:sensacine].each do |title, director|
+  match = directors[:yelmo].find { |other, _| other.downcase.strip == title.downcase.strip }
+  next unless match
+
+  agree   = director && match.last && director.casecmp?(match.last)
+  agreed += 1 if agree
+  puts format("  %-52s %-24s %-24s %s", title[0, 50].inspect, director.inspect, match.last.inspect,
+              agree ? "agree" : "DIFFER")
+end
+
+puts "\n#{agreed} film(s) both providers spell identically also agree on the director."
+
+# ---------------------------------------------------------------------------
+section "The films that fail to group — would the director rescue them?"
+
+# The previous probe paired every SensaCine screening with every Yelmo screening
+# at the same minute, which counted two different films in two screens as a
+# failure to group. This asks the real question: at this minute, which titles
+# does one provider list that the other does not match by key?
+unmatched = 0
+
+slots.sort.each do |(date, time), sides|
+  next if sides[:sensacine].empty? || sides[:yelmo].empty?
+
+  yelmo_keys     = sides[:yelmo].map { |title, _| title.downcase.strip }
+  sensacine_keys = sides[:sensacine].map { |title, _| title.downcase.strip }
+
+  orphans = sides[:sensacine].reject { |title, _| yelmo_keys.include?(title.downcase.strip) }
+  next if orphans.empty?
+
+  candidates = sides[:yelmo].reject { |title, _| sensacine_keys.include?(title.downcase.strip) }
+  next if candidates.empty?
+
+  unmatched += orphans.length
   puts "  #{date} #{time}"
-  puts "    sensacine: #{from_sensacine.inspect}"
-  puts "    yelmo    : #{from_yelmo.inspect}"
+  orphans.uniq.each { |title, director| puts "    sensacine: #{title.inspect} dir=#{director.inspect}" }
+  candidates.uniq.each { |title, director| puts "    yelmo    : #{title.inspect} dir=#{director.inspect}" }
 end
 
-# ---------------------------------------------------------------------------
-section "Does TMDB resolve every spelling of a film to one id?"
-
-by_tmdb_id = Hash.new { |films, id| films[id] = [] }
-
-titles.each do |provider, seen|
-  seen.uniq.each do |title, year|
-    match = tmdb_top_match(title, year)
-    label = match ? "id=#{match["id"]} #{match["title"].inspect} (#{match["release_date"]})" : "NO MATCH"
-    puts format("  %-10s %-52s -> %s", provider, title[0, 50].inspect, label)
-    by_tmdb_id[match&.fetch("id")] << [provider, title]
-  end
-end
-
-puts "\nProvider titles grouped by the TMDB id they resolved to:\n\n"
-by_tmdb_id.each do |id, entries|
-  next if entries.length < 2 && id
-
-  puts "  #{id ? "id=#{id}" : "NO MATCH"}"
-  entries.each { |provider, title| puts "    #{provider}: #{title.inspect}" }
-end
-
-# ---------------------------------------------------------------------------
-section "One SensaCine movie object, unpruned"
-
-# bin/capture_fixtures.rb drops credits and cast, so the fixtures cannot answer
-# whether SensaCine carries an external id or a director to match Yelmo's on.
-cinema   = shared.first || CINEMAS.first
-url      = "#{VoCinema::Showtimes::Sensacine::DOMAIN}/_/showtimes/theater-#{cinema.sensacine_id}/d-#{Date.today}/"
-response = VoCinema::Http::Client.new(headers: VoCinema::Showtimes::Sensacine::HEADERS).get(url)
-entry    = response.code == "200" ? JSON.parse(response.body)["results"].to_a.first : nil
-
-if entry
-  movie = entry["movie"]
-  puts "Every key on movie: #{movie.keys.sort.inspect}\n\n"
-  movie.each do |key, value|
-    next if %w[synopsis synopsis_json synopsisFull poster].include?(key)
-
-    puts format("  %-16s %s", key, value.inspect[0, 160])
-  end
-else
-  puts "No results for #{cinema.name} today (HTTP #{response.code}) — try again earlier in the day."
-end
+puts "\n#{unmatched} screening(s) where one provider's title found no match on the other side."
 
 puts "\n\nDone."
