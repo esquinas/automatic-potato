@@ -88,7 +88,7 @@ missing_credits = []
 
 shared.each do |cinema|
   DAYS.times do |offset|
-    date = (Date.today + offset).to_s
+    date = (VoCinema::Clock.today + offset).to_s
 
     sensacine_day(cinema, date).each do |entry|
       movie    = entry["movie"] || {}

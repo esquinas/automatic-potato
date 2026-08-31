@@ -92,7 +92,7 @@ CINEMAS.each do |cinema|
   puts "\n--- #{cinema.name} (id=#{cinema.sensacine_id}) ---"
 
   DAYS.times do |offset|
-    date = (Date.today + offset).to_s
+    date = (VoCinema::Clock.today + offset).to_s
     url  = "#{VoCinema::Showtimes::Sensacine::DOMAIN}/_/showtimes/theater-#{cinema.sensacine_id}/d-#{date}/"
     resp = sensacine_http.get(url)
 

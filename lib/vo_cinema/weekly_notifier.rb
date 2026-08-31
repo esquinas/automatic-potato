@@ -20,7 +20,8 @@ module VoCinema
       @cinemas   = cinemas
     end
 
-    def run(today: Date.today)
+    # Today where the cinemas are, not on the machine running this — see Clock.
+    def run(today: Clock.today)
       weeks = @cinemas.map { |cinema| [cinema, Reconciliation.new(week_at(cinema, today))] }
 
       report_agreement(weeks, today)
