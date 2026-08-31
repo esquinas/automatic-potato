@@ -313,9 +313,10 @@ describe the same film and which claims about a screening to believe. It went
 into a class of its own when the matching stopped being a `group_by` one-liner:
 the rules have real evidence behind them and want somewhere to be explained,
 and the notifier's job is to ask the providers and hand the answer on, not to
-adjudicate between them. It is pure and independent of the order the providers
-were given in, deliberately, so that adding a provider cannot silently change
-what a subscriber reads. `Film#same_film_as?` is the one piece that lives
+adjudicate between them. It is pure, and independent of the order the providers
+were given in — but only because it sorts the records at a minute before
+grouping them, which is load-bearing rather than tidiness: see *Being the same
+film is not transitive* below. `Film#same_film_as?` is the one piece that lives
 elsewhere: whether two records are the same film is the film's own business.
 
 **`Film` is a mutable PORO** — `title` starts `nil` and is filled after TMDB lookup. `Data.define` was rejected here because immutability would require propagating new instances across all `ScreeningSession` references that already hold the original `Film`.
@@ -378,6 +379,29 @@ it is the film's real one. Ties break alphabetically, which carries no meaning
 beyond settling `"La Sustancia"` against `"La sustancia"` the same way every
 run — a rule with an actual opinion about capitals is still wanted.
 
+### Being the same film is not transitive
+
+Rule 2 can hold between A and B, and between A and C, while B and C match
+neither each other nor anything else — a bare title is a prefix of two
+different suffixed ones that are prefixes of neither. A record joins the group
+whose *first* member it matches, so whichever record is read first anchors the
+group and decides what merges with what.
+
+`Reconciliation#one_per_film` therefore **sorts the records at a minute by
+`spelling_rank` before grouping them**. That is what makes the answer a function
+of the records rather than of the order the providers were asked in, and it is
+why the shortest title anchors each group. Remove the sort and the same week can
+merge two ways on two runs;
+`test_three_spellings_at_one_minute_group_the_same_way_whatever_the_order`
+pins it.
+
+Grouping by connected components instead — merge A, B and C because A matches
+both — was considered and is **wrong**: it would make `"Nosferatu"` swallow both
+the 1922 and the 2024 film. Non-transitivity is a real property of the rule, not
+an artefact to be closed over. It cannot bite on today's two providers, which
+give at most two records per screening, but it is exactly what a third would
+bring, so it wants a settled reading order before then rather than after.
+
 ### What the evidence says
 
 Two runs of `bin/probe_identity.rb` against the live providers, 30–31 August
@@ -413,7 +437,9 @@ In rough order of value for effort:
 
 - **Count the disagreements** (below) before loosening anything further. Without
   it there is no way to tell a rule that helps from one that quietly merges
-  films that are not the same.
+  films that are not the same. Loosening also makes non-transitivity easier to
+  hit, and the sort only settles *which* way it resolves, not whether the
+  resolution is right.
 - **Normalise punctuation before the prefix test.** The prefix test misses
   `"The Fast and the Furious (A todo gas) - 25 Aniversario"` against `"The Fast
   & The Furious 25 aniversario"` — `and` against `&`, plus a parenthetical.

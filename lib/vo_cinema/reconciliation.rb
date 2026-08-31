@@ -31,8 +31,17 @@ module VoCinema
     # Two records at the same cinema, day and minute either describe one
     # screening or two films showing side by side in different screens — which
     # is common in a multiplex, so the film has to decide.
+    #
+    # The sort is what keeps the answer a function of the records rather than
+    # of the order they arrived in. Film#same_film_as? is not transitive — a
+    # bare title can match two different suffixed ones that do not match each
+    # other — so which records group depends on which is compared first. Reading
+    # them shortest-title-first settles that the same way every run, whatever
+    # order the providers were asked in, and makes each group's first record the
+    # one whose spelling gets printed.
     def one_per_film(sessions)
-      sessions.each_with_object([]) { |session, films| place(session, films) }
+      sessions.sort_by { |session| spelling_rank(session.film) }
+              .each_with_object([]) { |session, films| place(session, films) }
               .map { |group| agreed(group) }
     end
 
@@ -57,9 +66,10 @@ module VoCinema
     # That is an accepted cost: the box office says which print it is before
     # anyone pays, and cinemas are far more careful about the opposite mistake
     # — an audience expecting dubbing and getting subtitles complains.
+    # The group was read shortest-title-first, so its first record is already
+    # the one whose spelling should print.
     def agreed(group)
-      group.min_by { |session| spelling_rank(session.film) }
-           .with(original_version?: group.any?(&:original_version?))
+      group.first.with(original_version?: group.any?(&:original_version?))
     end
 
     # Whose spelling the digest prints. The shortest wins, because the records

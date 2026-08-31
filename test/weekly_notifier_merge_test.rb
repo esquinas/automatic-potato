@@ -198,6 +198,49 @@ class WeeklyNotifierMergeTest < ServiceTest
     assert_equal 2, outbox.digest.text.scan("Nosferatu").length
   end
 
+  def test_the_order_does_not_change_a_film_the_director_rescued
+    # The order test above uses one spelling, so it never reaches the rescue.
+    # This one does: a record joins the group whose *first* member it matches,
+    # so which records group could otherwise depend on which arrived first.
+    one_way = digest_from(
+      sensacine: [screening(film("Harry Potter y la Piedra Filosofal", year: 2001, director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: false)],
+      yelmo:     [screening(film("Harry Potter y la Piedra Filosofal 25 Aniversario", director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: true)]
+    )
+
+    other_way = digest_from(
+      sensacine: [screening(film("Harry Potter y la Piedra Filosofal 25 Aniversario", director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: true)],
+      yelmo:     [screening(film("Harry Potter y la Piedra Filosofal", year: 2001, director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: false)]
+    )
+
+    assert_equal one_way.digest.text, other_way.digest.text
+  end
+
+  def test_three_spellings_at_one_minute_group_the_same_way_whatever_the_order
+    # Being the same film is not a transitive relation: a bare title is a prefix
+    # of two different suffixed ones that are prefixes of neither each other.
+    # Whichever is read first anchors the group, so without a settled reading
+    # order the same week could merge two ways on two runs.
+    plain      = film("Vaiana", year: 2026, director: "Thomas Kail")
+    four_k     = film("Vaiana 4K", director: "Thomas Kail")
+    re_release = film("Vaiana Reestreno", director: "Thomas Kail")
+
+    at_five = lambda do |one, two, three|
+      [screening(one, on: "2026-09-04", at: "17:00"),
+       screening(two, on: "2026-09-04", at: "17:00"),
+       screening(three, on: "2026-09-04", at: "17:00")]
+    end
+
+    outbox = digest_from(sensacine: at_five.call(plain, four_k, re_release), yelmo: [])
+    backwards = digest_from(sensacine: at_five.call(re_release, four_k, plain), yelmo: [])
+
+    assert_equal ["17:00"], outbox.digest.times_listed_for("Vaiana")
+    assert_equal outbox.digest.text, backwards.digest.text
+  end
+
   def test_without_a_director_the_two_spellings_stay_two_films
     # What the digest did before either provider's director was read, and what
     # it still does when one of them will not name one. Survivable rather than
