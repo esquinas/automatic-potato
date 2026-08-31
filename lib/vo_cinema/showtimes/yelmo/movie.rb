@@ -13,7 +13,7 @@ module VoCinema
       # lends one from SensaCine where both describe the same film.
       class Movie
         def initialize(movie)
-          @movie = movie || {}
+          @movie = movie.to_h
         end
 
         # A film the payload does not name is not a film, for the same reason

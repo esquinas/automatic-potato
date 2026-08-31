@@ -14,15 +14,20 @@ module VoCinema
     # Plain text, no markup: whoever prints this decides how it is dressed.
     class Timetable
       def initialize(sessions, week_days:)
-        @days = sessions.group_by(&:date)
-                        .transform_values { |group| group.map(&:starts_at).sort.uniq }
-                        .sort.to_h
+        @days      = times_by_day(sessions)
         @week_days = week_days
       end
 
       def to_s = whole_week? ? all_week : day_by_day
 
       private
+
+      # { "2026-08-29" => ["17:00", "20:30"], ... }, in date order.
+      def times_by_day(sessions)
+        sessions.group_by(&:date)
+                .transform_values { |on_one_day| on_one_day.map(&:starts_at).sort.uniq }
+                .sort.to_h
+      end
 
       def whole_week? = @days.length == @week_days
 

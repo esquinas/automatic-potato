@@ -27,7 +27,7 @@ module VoCinema
       #
       # The records were read shortest-title-first, so the first one already
       # carries the spelling that should print.
-      def session = records.first.session.with(original_version?: records.any?(&:original_version?))
+      def session = records.first.session.with(original_version?: original_version_claims.any?)
 
       def minute = records.first.minute
 
@@ -38,18 +38,27 @@ module VoCinema
       # Only a screening more than one provider described can be contradicted.
       def described_twice? = providers.length > 1
 
-      def disagreed? = records.map(&:original_version?).uniq.length > 1
+      # Uniqueness is counted by length here and below, never with #one?, which
+      # counts truthy elements rather than elements: [true, false].one? is true,
+      # and a list of original-version claims is exactly where that would bite.
+      def disagreed? = original_version_claims.uniq.length > 1
 
       # Whether the titles matched outright or the director had to rescue them.
-      def by_title? = records.map(&:film).map(&:key).uniq.one?
+      def by_title? = records.map { |record| record.film.key }.uniq.length == 1
 
       # The provider that was the only one calling this original version, if
       # exactly one was. Nil when they all agreed, either way.
       def sole_vo_source
         claiming = records.select(&:original_version?).map(&:provider).uniq
 
-        claiming.first if claiming.one?
+        claiming.first if claiming.length == 1
       end
+
+      private
+
+      # What each provider said about this screening's language, in order. Two
+      # of the questions above are asked of exactly this list.
+      def original_version_claims = records.map(&:original_version?)
     end
   end
 end

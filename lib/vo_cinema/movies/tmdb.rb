@@ -1,78 +1,58 @@
 # frozen_string_literal: true
 
-require "json"
-require "uri"
-
 module VoCinema
   module Movies
     # What TMDB knows about a film the cinemas listed in Spanish: its original
     # title, its rating, and whether it is a Spanish production.
     #
     # Three pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
+    # Putting the question to TMDB is Search's job; this class only decides what
+    # comes back means.
     class Tmdb
-      DOMAIN          = "https://api.themoviedb.org"
+      DOMAIN = "https://api.themoviedb.org"
+
+      # How far ahead of the runner-up the best match has to be before its score
+      # is worth printing.
       AMBIGUITY_RATIO = 2.0
 
       def initialize(api_key: ENV.fetch("TMDB_API_KEY"), http: Http::Client.new)
-        @api_key = api_key
-        @http    = http
-        @results = {}
+        @search = Search.new(api_key: api_key, http: http)
       end
 
-      def fetch_original_title(film)
-        top_match_for(film.localized_title, film.year)&.dig("original_title")
-      end
+      def fetch_original_title(film) = best_match_for(film)&.dig("original_title")
 
-      def spanish_original?(film)
-        top_match_for(film.localized_title, film.year)&.dig("original_language") == "es"
-      end
+      def spanish_original?(film) = best_match_for(film)&.dig("original_language") == "es"
 
+      # Asked by the original title once that is known, because it is the one
+      # TMDB itself files the film under.
       def rating_for(film)
-        score = confident_score(search(film.title || film.localized_title, film.year))
+        score = confident_score(@search.results_for(film.title || film.localized_title, film.year))
 
         score ? Rating.new(score: score) : Rating.null
       end
 
       private
 
-      def top_match_for(title, year) = search(title, year).first
+      # Searched for by the title the cinema printed, which is all a provider
+      # knows the film by.
+      def best_match_for(film) = @search.results_for(film.localized_title, film.year).first
 
-      # TMDB always answers something, so a score is only worth printing when
-      # the top result is clearly the film we meant: somebody has to have voted
-      # on it, and it has to beat the runner-up clearly enough that the two are
-      # not plausibly the same search gone wrong.
+      # TMDB always answers something, so a score is only worth printing when the
+      # best match is clearly the film we meant: somebody has to have voted on
+      # it, and it has to beat the runner-up clearly enough that the two are not
+      # plausibly the same search gone wrong.
       def confident_score(results)
-        top, runner_up = results
-        return nil if top.nil? || top["vote_count"].to_i.zero?
+        best, runner_up = results
+        return nil unless best && best["vote_count"].to_i.positive?
 
-        score       = top["vote_average"].to_f
-        second_best = runner_up&.dig("vote_average").to_f
-        return nil if second_best.positive? && score / second_best < AMBIGUITY_RATIO
-
-        score
+        score = best["vote_average"].to_f
+        score unless too_close_to_call?(score, runner_up)
       end
 
-      # One request per question per run, however often it is asked.
-      #
-      # #fetch_original_title and #spanish_original? ask TMDB exactly the same
-      # thing, and the notifier asks about every screening of a film rather
-      # than every film, so the same query went out two or three times over
-      # before this. A client is built once per run, which makes it the right
-      # lifetime for the answers.
-      def search(title, year = nil)
-        @results[[title, year]] ||= fetch(title, year)
-      end
+      def too_close_to_call?(score, runner_up)
+        runner_up_score = runner_up&.dig("vote_average").to_f
 
-      def fetch(title, year)
-        query = URI.encode_www_form(query: title, language: "es-ES", api_key: @api_key)
-        query += "&year=#{year}" if year
-        response = @http.get("#{DOMAIN}/3/search/movie?#{query}")
-        # An empty list rather than nil: "TMDB had nothing for us" and "TMDB
-        # would not answer" mean the same thing to every caller here, and a nil
-        # would have each of them checking for it.
-        return [] unless response.code == "200"
-
-        JSON.parse(response.body)["results"] || []
+        runner_up_score.positive? && score / runner_up_score < AMBIGUITY_RATIO
       end
     end
   end

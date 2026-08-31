@@ -55,16 +55,21 @@ module VoCinema
     # them shortest-title-first settles that the same way every run, whatever
     # order the providers were asked in, and makes each group's first record the
     # one whose spelling gets printed.
-    def one_per_film(at_one_minute)
-      at_one_minute.sort_by { |record| spelling_rank(record.film) }
-                   .each_with_object([]) { |record, films| place(record, films) }
-                   .map { |group| Match.new(records: group) }
+    def one_per_film(records_at_one_minute)
+      records_at_one_minute
+        .sort_by { |record| spelling_rank(record.film) }
+        .each_with_object([]) { |record, groups| add_to_its_group(record, groups) }
+        .map { |records_of_one_film| Match.new(records: records_of_one_film) }
     end
 
-    def place(record, films)
-      group = films.find { |other| record.film.same_film_as?(other.first.film) }
+    # Joins the record to the first group describing its film, or starts a group
+    # of its own. Because the records arrive shortest-title-first, every group is
+    # headed by the plainest spelling of the film — which is both the one that
+    # gets printed and the one the later records are compared against.
+    def add_to_its_group(record, groups)
+      same_film = groups.find { |group| record.film.same_film_as?(group.first.film) }
 
-      group ? group << record : films << [record]
+      same_film ? same_film << record : groups << [record]
     end
 
     # Whose spelling the digest prints. The shortest wins, because the records
@@ -78,6 +83,5 @@ module VoCinema
 
       [printed.length, printed]
     end
-
   end
 end

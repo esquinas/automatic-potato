@@ -33,9 +33,10 @@ module VoCinema
 
       # Yelmo runs a handful of cinemas; it has nothing to say about the rest.
       def sessions_for(cinema, date)
-        return [] unless cinema.yelmo_id
+        theater_id = cinema.yelmo_id
+        return [] unless theater_id
 
-        days_at(cinema.yelmo_id)[date] || []
+        days_at(theater_id).fetch(date, [])
       end
 
       private
@@ -48,16 +49,20 @@ module VoCinema
       # the cinema is picked out of the answer.
       def find_cinema(theater_id)
         city_key, cinema_key = theater_id.split("/", 2)
-        cinemas              = cinemas_in(city_key)
+        in_the_city          = cinemas_in(city_key)
 
-        cinemas.find { |cinema| cinema["Key"] == cinema_key } || missing(cinema_key, cinemas)
+        in_the_city.find { |cinema| cinema["Key"] == cinema_key } ||
+          report_missing(cinema_key, in_the_city)
       end
 
-      # Nothing to add when the request itself failed; that is already logged.
-      def missing(cinema_key, cinemas)
-        return nil if cinemas.empty?
+      # Always answers nil — a cinema that is not in the payload is not a
+      # cinema. Silent when the request itself failed, since that is already
+      # logged and an empty city says nothing about this venue.
+      def report_missing(cinema_key, in_the_city)
+        return nil if in_the_city.empty?
 
-        puts "  Yelmo: cinema #{cinema_key.inspect} not found (available: #{cinemas.map { |c| c["Key"] }.inspect})"
+        puts "  Yelmo: cinema #{cinema_key.inspect} not found " \
+             "(available: #{in_the_city.map { |cinema| cinema["Key"] }.inspect})"
         nil
       end
 

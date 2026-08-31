@@ -52,11 +52,12 @@ lib/
     reconciliation/shared_years.rb # lends SensaCine's years to Yelmo's undated copies
     agreement.rb        # pure: how much the providers contradicted each other
     agreement_report.rb # the CSV health block the run log carries
-    weekly_notifier.rb  # orchestrator: collect → enrich → render → send
+    weekly_notifier.rb  # orchestrator: ask the providers → reconcile → report → send
     http/
       client.rb         # the only code that touches the network: retry, pacing, shared headers
     showtimes/
-      sensacine.rb      # fetches a theatre-day, follows pagination
+      sensacine.rb      # which URL a cinema and a date make, and which venues it covers
+      sensacine/pages.rb# one day's entries, however many pages SensaCine split them over
       sensacine/day.rb  # reads one day's buckets and clock times into ScreeningSessions
       sensacine/movie.rb# reads one entry's title, year and director into a Film
       yelmo.rb          # fetches a city once, caches it
@@ -64,7 +65,9 @@ lib/
       yelmo/movie.rb    # reads one film's title and director into a Film
     movies/
       tmdb.rb           # original title, rating, and whether a film is a Spanish production
+      tmdb/search.rb    # puts the question to TMDB, once per question per run
     digest/
+      programme.rb      # what survives the week, enriched with what TMDB knows
       renderer.rb       # pure: turns listings into the Telegram message
       timetable.rb      # pure: one film's week, grouped by day and aligned into a column
     messengers/
@@ -282,6 +285,11 @@ buckets, language tags and timestamps and could not make a request if they
 wanted to. That split, plus moving every socket into `Http::Client`, is what
 took `lib/` from 89.96 to 92.19 on RubyCritic.
 
+SensaCine's fetching half then split again, because paging is its own job:
+`Sensacine::Pages` answers with one day's entries however many pages it took,
+and `Showtimes::Sensacine` is left settling only which URL a cinema and a date
+make — as thin over `Pages` and `Day` as `Yelmo` is over `Listing`.
+
 **Naming a film is separate from timing it** — each reader is itself two
 classes: `Sensacine::Movie` and `Yelmo::Movie` answer with a `Film` (or `nil`
 for an entry the feed never named), while `Sensacine::Day` and `Yelmo::Listing`
@@ -304,15 +312,24 @@ Accept-Language that both scraped endpoints demand. `bin/diagnose.rb` and
 `bin/capture_fixtures.rb` go through it too, so a probe cannot accidentally ask
 in a way the service never would.
 
-**Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
-providers, decides which screenings survive, and enriches each film;
-`DigestRenderer` turns the result into text and asks nobody anything. The
-renderer is a pure function of its input, so the digest can be reasoned about
-without a single stub, and the notifier is free of every string of markup.
-`CinemaListing` is what passes between them: one venue's week, already
-enriched. The split took `lib/` from 85.97 to 88.54 on RubyCritic, and — the
-part worth noticing — the test suite needed no edit at all, because it asserts
-on what the digest says rather than on how it is assembled.
+**Rendering is separate from orchestrating** — `Digest::Renderer` turns a
+week's listings into text and asks nobody anything. It is a pure function of
+its input, so the digest can be reasoned about without a single stub, and
+nothing upstream of it holds a string of markup. `CinemaListing` is what passes
+in: one venue's week, already enriched. The split took `lib/` from 85.97 to
+88.54 on RubyCritic, and — the part worth noticing — the test suite needed no
+edit at all, because it asserts on what the digest says rather than on how it
+is assembled.
+
+**Deciding what to print is separate from both** — `Digest::Programme` sits
+between them: it drops the screenings that do not belong at a venue that
+filters, fills in each film's original title and rating, and answers with the
+listings plus the names of the venues left with nothing. It is the one place
+TMDB is asked anything, which is what keeps the two sides either side of it
+honest: upstream the providers never hear of TMDB, downstream the renderer is
+handed everything it needs and asks for nothing. `WeeklyNotifier` is left with
+what it says on the tin — ask the providers, reconcile, log how much they
+agreed, send.
 
 **Reconciling the providers is its own object** — `Reconciliation` takes the
 weeks the providers answered with and reads them as one, deciding which records
@@ -332,13 +349,15 @@ elsewhere: whether two records are the same film is the film's own business.
 
 **`original_version?` resolved by the client** — `VO_BUCKETS.include?(bucket)` lives in `SensacineClient`. Domain objects stay free of provider-specific string vocabulary (`"original"`, `"local"`, `"dubbed"`).
 
-**Spanish-original films fall back to a TMDB check in `WeeklyNotifier`** — a Spanish production is never dubbed or subtitled, so no provider (`SensacineClient`'s buckets, `YelmoClient`'s `VO_LANGUAGES` tags) ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `WeeklyNotifier#collect_sessions` asks `TmdbClient#spanish_original?(film)` before excluding it, and keeps the session if the film's TMDB `original_language` is `"es"`. Results are memoized per `Film` for the run to avoid redundant TMDB calls across the week's sessions.
+**Spanish-original films fall back to a TMDB check in `Digest::Programme`** — a Spanish production is never dubbed or subtitled, so no provider (`Sensacine::Day`'s buckets, `Yelmo::Listing`'s `VO_LANGUAGES` tags) ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `Digest::Programme` asks `Movies::Tmdb#spanish_original?(film)` before excluding it, and keeps the session if the film's TMDB `original_language` is `"es"`. It asks once per screening rather than once per film and lets `Movies::Tmdb::Search` answer the repeats from its own cache, so there is no second cache here to keep in step.
 
 **`fetch_theater_movie_sessions` takes no filter arg** — the client always returns all sessions with `original_version?` set. The caller (`WeeklyNotifier`) filters with `.select(&:original_version?)` when `check_vo` is true. This keeps the client a pure data source.
 
 **`Rating` is a NullObject** — `Rating.null` returns a frozen instance with `score: nil`. Both present and null ratings implement `to_s` / `to_str`, so callers push them into a parts array and call `.join(" ").strip` — no conditionals, no `nil` checks. `Rating.null.to_s` returns `""`, which `strip` absorbs silently. `to_str` enables implicit coercion in `String#+` and `Array#join`.
 
-**Command-query separation on `TmdbClient`** — `fetch_original_title` and `rating_for` are pure queries. Mutation (`film.title =`) stays in `WeeklyNotifier`, which owns the enrichment lifecycle.
+**Command-query separation on `Movies::Tmdb`** — `fetch_original_title`, `rating_for` and `spanish_original?` are pure queries. Mutation (`film.title =`) stays in `Digest::Programme`, which owns the enrichment lifecycle.
+
+**Asking TMDB is separate from reading its answer** — `Movies::Tmdb::Search` owns the URL, the request and the answers already given; `Movies::Tmdb` owns what they mean (is the top result confident enough to print a score? is the original language Spanish?). Every question this service asks TMDB is the same search, so the cache belongs with the asking, and the judgement calls belong somewhere they can be read without a URL in the way.
 
 **Unified constructor signatures** — all `*Client` and `*Messenger` classes share the same call site: plain `.new`. Classes that need no config (`SensacineClient`, `StdoutMessenger`) declare `def initialize(**) = nil` to accept and silently discard any kwargs, keeping the interface consistent for callers that pass options uniformly.
 

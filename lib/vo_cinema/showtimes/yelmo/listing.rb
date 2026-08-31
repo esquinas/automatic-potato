@@ -12,8 +12,10 @@ module VoCinema
       class Listing
         VO_LANGUAGES = %w[VOSE SUBTITULAD V.O.S.].freeze
 
+        # Handed nil when the city payload had no such cinema: an absent venue
+        # simply has no days.
         def initialize(payload)
-          @payload = payload || {}
+          @payload = payload.to_h
         end
 
         # { "2026-08-29" => [ScreeningSession, ...] }
@@ -40,20 +42,19 @@ module VoCinema
           formats.flat_map { |format| screenings_in_format(film, date, format) }
         end
 
-        # A film is offered in several formats and each has its own list of
-        # times, so one film's day is two levels deep.
+        # Every time in one format is the same print of the same film, so the
+        # language tag is read once for all of them.
         def screenings_in_format(film, date, format)
-          times_in(format).map { |time| screening(film, date, time, format) }
-        end
+          original_version = original_version?(format)
 
+          times_in(format).map do |starts_at|
+            ScreeningSession.new(
+              film: film, date: date, starts_at: starts_at, original_version?: original_version
+            )
+          end
+        end
 
         def times_in(format) = (format["Showtimes"] || []).filter_map { |showtime| showtime["Time"]&.slice(0, 5) }
-
-        def screening(film, date, starts_at, format)
-          ScreeningSession.new(
-            film: film, date: date, starts_at: starts_at, original_version?: original_version?(format)
-          )
-        end
 
         def original_version?(format)
           language = format["Language"].to_s

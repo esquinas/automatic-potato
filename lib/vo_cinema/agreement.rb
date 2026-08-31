@@ -47,7 +47,7 @@ module VoCinema
 
     # Records left on their own at a minute more than one provider reported on:
     # the population the director rescue is trying to reach.
-    def unmatched = contested.sum { |at_one_minute| at_one_minute.count { |match| !match.merged? } }
+    def unmatched = contested.flatten(1).count { |match| !match.merged? }
 
     private
 
