@@ -15,6 +15,11 @@ on:
     - cron: '0 9 * * 1,5'   # 11:00 Gijón while CEST is in force
     - cron: '0 10 * * 1,5'  # 11:00 Gijón while CET is in force
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without sending: print the digest and the agreement block"
+        type: boolean
+        default: false
 
 jobs:
   notify:
@@ -42,9 +47,19 @@ jobs:
           bundler-cache: true
 
       - name: Send notification
-        if: steps.clock.outputs.send == 'true'
+        if: steps.clock.outputs.send == 'true' && inputs.dry_run != true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: ruby bin/run.rb
+
+      # Deliberately given no Telegram secrets: a dry run then *cannot* post,
+      # which is a property of the step rather than a promise about the code.
+      # This is how to read the agreement block without costing subscribers a
+      # duplicate digest.
+      - name: Preview the run without sending
+        if: inputs.dry_run == true
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: ruby bin/preview.rb
