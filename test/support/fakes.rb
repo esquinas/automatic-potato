@@ -17,9 +17,18 @@ class Listings
   def initialize(sessions_by_cinema)
     @sessions_by_cinema = sessions_by_cinema
     @days_asked_about   = []
+    @name               = "Listings"
+  end
+
+  # Two providers in one test have to answer to different names, or the
+  # agreement report cannot tell which of them said what — and counts a
+  # screening they both described as covered by one voice.
+  def self.named(name, sessions_by_cinema)
+    new(sessions_by_cinema).tap { |listings| listings.name = name }
   end
 
   attr_reader :days_asked_about
+  attr_accessor :name
 
   def sessions_for(cinema, date)
     @days_asked_about << [cinema.name, date]

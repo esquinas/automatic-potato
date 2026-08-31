@@ -28,6 +28,10 @@ module VoCinema
         @http = http
       end
 
+      # How the run log names this provider when reporting what the providers
+      # disagreed about. Spelled the way SensaCine spells itself.
+      def name = "SensaCine"
+
       # Nothing to say about a venue SensaCine does not list.
       def sessions_for(cinema, date)
         return [] unless cinema.sensacine_id
