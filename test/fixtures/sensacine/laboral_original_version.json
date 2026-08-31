@@ -106,7 +106,27 @@
           "isPremiere": false,
           "weeklyOuting": true
         },
-        "synopsisFull": "<p class=\"bo-p\">Harry Potter, un niño huérfano, descubre en su undécimo cumpleaños que es hijo de dos destacados magos y…"
+        "synopsisFull": "<p class=\"bo-p\">Harry Potter, un niño huérfano, descubre en su undécimo cumpleaños que es hijo de dos destacados magos y…",
+        "credits": [
+          {
+            "person": {
+              "__typename": "Person",
+              "internalId": 3474,
+              "lastName": "Columbus",
+              "firstName": "Chris",
+              "seo": {
+                "__typename": "Seo",
+                "browsable": true
+              }
+            },
+            "position": {
+              "__typename": "Position",
+              "name": "DIRECTOR",
+              "department": "DIRECTION"
+            },
+            "rank": 1
+          }
+        ]
       },
       "showtimes": {
         "local": [
@@ -355,7 +375,27 @@
           "isPremiere": false,
           "weeklyOuting": true
         },
-        "synopsisFull": "<p class=\"bo-p\">Un aclamado director de cine y su hija, una actriz sin éxito, ruedan juntos una película tras años de…"
+        "synopsisFull": "<p class=\"bo-p\">Un aclamado director de cine y su hija, una actriz sin éxito, ruedan juntos una película tras años de…",
+        "credits": [
+          {
+            "person": {
+              "__typename": "Person",
+              "internalId": 204103,
+              "lastName": "Sorogoyen",
+              "firstName": "Rodrigo",
+              "seo": {
+                "__typename": "Seo",
+                "browsable": true
+              }
+            },
+            "position": {
+              "__typename": "Position",
+              "name": "DIRECTOR",
+              "department": "DIRECTION"
+            },
+            "rank": 1
+          }
+        ]
       },
       "showtimes": {
         "local": [
@@ -534,7 +574,27 @@
           "isPremiere": false,
           "weeklyOuting": true
         },
-        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…"
+        "synopsisFull": "<p class=\"bo-p\">En un mundo devastado por un virus mortal que ha exterminado a la humanidad, los supervivientes luchan p…",
+        "credits": [
+          {
+            "person": {
+              "__typename": "Person",
+              "internalId": 258,
+              "lastName": "Scott",
+              "firstName": "Ridley",
+              "seo": {
+                "__typename": "Seo",
+                "browsable": true
+              }
+            },
+            "position": {
+              "__typename": "Position",
+              "name": "DIRECTOR",
+              "department": "DIRECTION"
+            },
+            "rank": 1
+          }
+        ]
       },
       "showtimes": {
         "local": [

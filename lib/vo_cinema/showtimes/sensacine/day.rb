@@ -10,6 +10,7 @@ module VoCinema
       class Day
         VO_BUCKETS         = %w[original original_st original_sme local local_st local_sme].freeze
         UNFILTERED_BUCKETS = (VO_BUCKETS + %w[dubbed dubbed_st dubbed_sme]).freeze
+        DIRECTOR           = "DIRECTOR"
 
         def initialize(entries, date)
           @entries = entries
@@ -20,8 +21,17 @@ module VoCinema
 
         private
 
+        # An entry the feed does not name is dropped. It used to become a film
+        # called "(untitled)", which TMDB answered with "Untitled Immaculate
+        # Reception Film" — so a concert reached the digest under a stranger's
+        # name. There is nothing to print, nothing to look up and nothing to
+        # match on; where another provider covers the same screening it arrives
+        # from there properly named, as the André Rieu concert at Ocimax does.
         def screenings_in(entry)
-          film = Film.new(localized_title: title_of(entry), year: year_of(entry))
+          title = entry.dig("movie", "title")
+          return [] if title.to_s.strip.empty?
+
+          film = Film.new(localized_title: title, year: year_of(entry), director: director_of(entry))
 
           UNFILTERED_BUCKETS.flat_map { |bucket| screenings_in_bucket(entry, bucket, film) }
         end
@@ -43,7 +53,16 @@ module VoCinema
           )
         end
 
-        def title_of(entry) = entry.dig("movie", "title") || "(untitled)"
+        # The credits are a flat list of everyone who worked on the film, each
+        # tagged with the job they did; the director is the one the providers
+        # can be matched on, because Yelmo publishes one too.
+        def director_of(entry)
+          credit = (entry.dig("movie", "credits") || []).find { |one| one.dig("position", "name") == DIRECTOR }
+          person = credit&.dig("person") || {}
+          name   = [person["firstName"], person["lastName"]].compact.join(" ").strip
+
+          name.empty? ? nil : name
+        end
 
         # The feed carries the film's own year under movie.data and the dates it
         # reached cinemas under movie.releases[]. The production year is the one

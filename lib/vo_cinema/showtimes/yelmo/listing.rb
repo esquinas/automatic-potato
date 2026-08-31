@@ -30,10 +30,30 @@ module VoCinema
           (day["Movies"] || []).flat_map { |movie| screenings_of(movie, date) }
         end
 
+        # A film the payload does not name is dropped, for the same reason
+        # SensaCine's untitled entries are: there is nothing to print, look up
+        # or match on. See Sensacine::Day#screenings_in.
         def screenings_of(movie, date)
-          film = Film.new(localized_title: movie["Title"] || "(untitled)", year: nil)
+          title = movie["Title"].to_s
+          return [] if title.strip.empty?
 
-          (movie["Formats"] || []).flat_map { |format| times_in(format).map { |time| screening(film, date, time, format) } }
+          film = Film.new(localized_title: title, year: nil, director: director_of(movie))
+
+          (movie["Formats"] || []).flat_map { |format| screenings_in_format(film, date, format) }
+        end
+
+        # A film is offered in several formats and each has its own list of
+        # times, so one film's day is two levels deep.
+        def screenings_in_format(film, date, format)
+          times_in(format).map { |time| screening(film, date, time, format) }
+        end
+
+        # Yelmo pads some names with a double space ("Will  Gluck"), which is
+        # why Film compares directors squeezed rather than as written.
+        def director_of(movie)
+          name = movie["Director"].to_s.strip
+
+          name.empty? ? nil : name
         end
 
         def times_in(format) = (format["Showtimes"] || []).filter_map { |showtime| showtime["Time"]&.slice(0, 5) }
