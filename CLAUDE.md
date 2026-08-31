@@ -510,14 +510,22 @@ they contradict each other is a free drift detector. Every run prints one:
 ```
 ===== BEGIN agreement =====
 run_on,cinema,overlapping,disagreed,sole_vo_source,by_title,by_director,unmatched
-2026-08-31,Yelmo Cines Ocimax Gijón,117,7,Yelmo,111,6,6
+2026-09-01,Yelmo Cines Ocimax Gijón,117,7,Yelmo,111,6,6
 ===== END agreement =====
 ```
 
-**That row is measured, not illustrative** — it is the first live reading, taken
-on 31 August 2026 with `bin/preview.rb` through the **Weekly VO Cinema
-Notifier** workflow (`dry_run: true`). Take the reading again the same way; it
-prints the digest too, and cannot post.
+**That row is measured, not illustrative** — taken on 1 September 2026 with
+`bin/preview.rb` through the **Weekly VO Cinema Notifier** workflow
+(`dry_run: true`). Take the reading again the same way; it prints the digest
+too, and cannot post.
+
+It was read twice: once before `Clock` existed, when the run asked about
+2026-08-31 → 09-06, and again after, asking 09-01 → 09-07. **Every count came
+out the same**, because Ocimax answered `next.showtime.on` for 5, 6 and 7
+September — so the day the bug wrongly included was already spent and the day
+it wrongly dropped had nothing to book. The window was wrong and the
+measurement happened not to be, which is luck rather than reassurance: a week
+with programme on its last day would have differed.
 
 - `overlapping` — screenings more than one provider described. Only these can
   be disagreed about, so they are the denominator; a venue with one provider
