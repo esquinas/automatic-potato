@@ -160,8 +160,17 @@ Consequences, all of which are easy to get wrong:
 - **Judge an empty result by the clock.** Empty for *today* late in the day is
   normal. Empty for a *future* day cannot be expiry, so that is the signal
   worth alarming on.
-- **`error: true` with a `nextDate` is a healthy answer.** Missing `nextDate`,
-  a non-200, or an unparseable body is not. Do not lump them together.
+- **`error: true` with a `nextDate` is a healthy answer.** A non-200 or an
+  unparseable body is not. Do not lump them together.
+- **There are two error messages, and only one carries a `nextDate`.**
+  `next.showtime.on` is the day-has-drained answer described above and names the
+  next date. `no.showtime.error` comes back with an *empty* `nextDate` and means
+  something else: this venue has no film programme at all. The municipal centres
+  (`G02E8`, `G02E9`, `G02GD`) answer that way every day of the week — they
+  screen films only occasionally, and SensaCine lists them regardless. Both are
+  benign, so an empty `nextDate` is not on its own a fault; what would be worth
+  alarming on is `no.showtime.error` from a venue that normally programmes, or
+  a message that is neither of these two. Observed on the 2026-08-31 preview run.
 - The cron fires at 11:00 in Gijón, ahead of the day's first screening (the
   earliest seen at Ocimax is 16:00), so day zero reaches subscribers whole. It
   used to fire at 16:00 local, which silently dropped every matinee. GitHub's
@@ -445,11 +454,12 @@ before changing any of this.
 
 In rough order of value for effort:
 
-- **Count the disagreements** (below) before loosening anything further. Without
-  it there is no way to tell a rule that helps from one that quietly merges
-  films that are not the same. Loosening also makes non-transitivity easier to
-  hit, and the sort only settles *which* way it resolves, not whether the
-  resolution is right.
+The counter that used to head this list now exists, and the baseline it took is
+in *Reading the agreement block* below. Measure against it: any change here
+should move `by_director` or `unmatched` in a way you predicted before running
+it. Loosening also makes non-transitivity easier to hit, and the sort only
+settles *which* way it resolves, not whether the resolution is right.
+
 - **Normalise punctuation before the prefix test.** The prefix test misses
   `"The Fast and the Furious (A todo gas) - 25 Aniversario"` against `"The Fast
   & The Furious 25 aniversario"` — `and` against `&`, plus a parenthetical.
@@ -479,9 +489,14 @@ they contradict each other is a free drift detector. Every run prints one:
 ```
 ===== BEGIN agreement =====
 run_on,cinema,overlapping,disagreed,sole_vo_source,by_title,by_director,unmatched
-2026-08-31,Yelmo Cines Ocimax Gijón,41,8,Yelmo,33,8,4
+2026-08-31,Yelmo Cines Ocimax Gijón,117,7,Yelmo,111,6,6
 ===== END agreement =====
 ```
+
+**That row is measured, not illustrative** — it is the first live reading, taken
+on 31 August 2026 with `bin/preview.rb` through the **Weekly VO Cinema
+Notifier** workflow (`dry_run: true`). Take the reading again the same way; it
+prints the digest too, and cannot post.
 
 - `overlapping` — screenings more than one provider described. Only these can
   be disagreed about, so they are the denominator; a venue with one provider
@@ -499,6 +514,24 @@ original version. What is worth alarming on is `disagreed` at zero over a
 non-zero `overlapping`, `sole_vo_source` emptying, or `overlapping` at zero
 with `unmatched` high — that last one means both providers are talking and
 nothing they say lines up.
+
+**What the one reading we have looks like**, as a reference point rather than a
+distribution — it is a single week at a single cinema:
+
+- `disagreed` / `overlapping` — **7/117, about 6%**. Yelmo was the lone VO voice
+  every time.
+- `by_director` / merges — **6/117, about 5%**. Small, and exactly the
+  population the rescue was built for: the anniversary Harry Potter and the
+  concert SensaCine lists untitled. Before the rescue those printed under
+  Yelmo's suffixed spelling with no rating, because TMDB cannot find
+  `"…25 Aniversario"`; merged, they take SensaCine's clean name and resolve.
+- `by_title` + `by_director` came to exactly `overlapping`, which holds only
+  while every merge is two records from two providers. A third provider, or one
+  listing a film twice at a minute, would separate them.
+
+A caveat on reading the ratio too closely: `disagreed` counts merges the VO
+filter later dropped as well as the ones that reached the digest, so it is not
+the number of subtitled screenings a subscriber saw.
 
 It goes in the run log and never in the Telegram digest: provider health is not
 something a subscriber should have to read about.
