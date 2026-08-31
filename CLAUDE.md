@@ -23,6 +23,7 @@ Each branch maps to exactly one PR. When master moves forward (merged PRs), alwa
 ruby test.rb              # run all tests (minitest 5, inline Gemfile)
 VERBOSE=1 ruby test.rb    # ...and let the clients' own logging through
 ruby bin/run.rb           # run the notifier (requires env vars below)
+ruby bin/preview.rb       # ...the same run printed instead of sent; needs only TMDB_API_KEY
 ruby bin/diagnose.rb      # check the tokens and probe SensaCine live
 ```
 
@@ -72,8 +73,10 @@ lib/
       stdout.rb         # prints the digest; strips the markup a terminal cannot use
 bin/
   run.rb                # thin entry point
+  preview.rb            # the same run, printed instead of sent; cannot post
   diagnose.rb           # token health check + live SensaCine probe
   capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
+  probe_identity.rb     # asks how the providers name the same film
 config/cinemas.yml      # user-editable cinema list (name, provider ids, url, check_vo flag)
 .mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
@@ -84,7 +87,7 @@ test/
 .github/workflows/
   test.yml              # runs ruby test.rb on every pull request and on master
   rubycritic.yml        # code quality gate on lib/ (minimum score 92)
-  weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
+  weekly.yml            # Monday and Friday 11:00 Gijón cron; dispatch takes dry_run
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
 ```
