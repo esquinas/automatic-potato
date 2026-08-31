@@ -47,6 +47,11 @@ lib/
     screening_session.rb# Data.define: film, date, starts_at, original_version?
     cinema_listing.rb   # Data.define: one cinema's week, enriched and ready to print
     reconciliation.rb   # pure: several providers' accounts of one week, read as one
+    reconciliation/record.rb       # one provider's account of one screening, with its name
+    reconciliation/match.rb        # the film those records turned out to describe
+    reconciliation/shared_years.rb # lends SensaCine's years to Yelmo's undated copies
+    agreement.rb        # pure: how much the providers contradicted each other
+    agreement_report.rb # the CSV health block the run log carries
     weekly_notifier.rb  # orchestrator: collect → enrich → render → send
     http/
       client.rb         # the only code that touches the network: retry, pacing, shared headers
@@ -73,7 +78,7 @@ config/cinemas.yml      # user-editable cinema list (name, provider ids, url, ch
 .mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
 test/
-  support/              # FakeHttp, fixtures loader, digest reader, fakes
+  support/              # FakeHttp, fixtures loader, digest reader, fakes, Tee
   fixtures/             # real captured provider payloads (see its README)
   **/*_test.rb          # mirrors lib/, plus end_to_end_test.rb
 .github/workflows/
@@ -90,8 +95,10 @@ test/
   providers, `Movies::` for TMDB, `Messengers::` for delivery, `Digest::` for
   rendering, `Http::` for the network. A new class needs a file in the right
   place and nothing else — there is no `require_relative` below `lib/vo_cinema.rb`.
-- A provider answers `sessions_for(cinema, date)`; a messenger answers
-  `send_message(text)`. Both are built with a plain `.new`.
+- A provider answers `sessions_for(cinema, date)` and `name`; a messenger
+  answers `send_message(text)`. Both are built with a plain `.new`. The name is
+  what the agreement report calls it, spelled as the provider spells itself
+  (`"SensaCine"`, `"Yelmo"`).
 - Each class that talks to a service exposes a `DOMAIN` constant and its own
   `HEADERS`, composed from `Http::Client::BROWSER`.
 - `VoCinema::Digest` deliberately shadows nothing: stdlib `::Digest` is still
@@ -166,7 +173,7 @@ Consequences, all of which are easy to get wrong:
 
 **Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
 
-Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `Reconciliation#lend_known_years` closes that at merge time by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
+Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `Reconciliation::SharedYears` closes that before anything is grouped, by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
 
 **Director:** `movie.credits[]` is a flat list of everyone who worked on the
 film, each entry tagged with the job it did:
@@ -459,17 +466,57 @@ In rough order of value for effort:
   every rule above; `RunTime`/`runtime` are published by both and would let a
   looser time window stay safe.
 
+## Reading the agreement block
+
+With the union rule a provider that quietly stops tagging VO is invisible: the
+others carry, and the digest just gets thinner — indistinguishable from a quiet
+week. Ocimax is described by two independent providers, so the rate at which
+they contradict each other is a free drift detector. Every run prints one:
+
+```
+===== BEGIN agreement =====
+run_on,cinema,overlapping,disagreed,sole_vo_source,by_title,by_director,unmatched
+2026-08-31,Yelmo Cines Ocimax Gijón,41,8,Yelmo,33,8,4
+===== END agreement =====
+```
+
+- `overlapping` — screenings more than one provider described. Only these can
+  be disagreed about, so they are the denominator; a venue with one provider
+  gets no row at all, because one voice cannot be contradicted.
+- `disagreed` / `sole_vo_source` — how often they differed on
+  `original_version?`, and who was the lone voice for it.
+- `by_title` / `by_director` / `unmatched` — which rule merged each screening,
+  and how many records found no partner at a minute both providers reported on.
+  This is what makes the matching rules safe to loosen: a change that makes
+  `by_director` jump is visible instead of silent.
+
+**Disagreement is the healthy state here.** SensaCine files Yelmo's subtitled
+prints as dubbed, so Yelmo is routinely the only one calling a screening
+original version. What is worth alarming on is `disagreed` at zero over a
+non-zero `overlapping`, `sole_vo_source` emptying, or `overlapping` at zero
+with `unmatched` high — that last one means both providers are talking and
+nothing they say lines up.
+
+It goes in the run log and never in the Telegram digest: provider health is not
+something a subscriber should have to read about.
+
+**Nothing is persisted, deliberately.** The service is a stateless Actions cron,
+and GitHub keeps the logs 90 days — about 26 runs of history for free. The
+signals above are absolute rather than relative, so a single run is readable
+without a baseline. If watching the trend ever needs more, the rows are already
+valid CSV between markers: appending them to a file becomes a change to
+`weekly.yml` (`sed -n '/BEGIN agreement/,/END agreement/p'` after `bin/run.rb`)
+with no change to any code. `actions/cache` would be the wrong home — it evicts
+after 7 days of no access, and a health monitor that silently loses its baseline
+is worse than none.
+
 ## Known gaps
 
 Recorded rather than fixed, with enough context to pick up cold.
 
-**Log how often the providers disagree.** With the union rule a provider that
-quietly stops tagging VO is invisible: the others carry, and the digest just
-gets thinner. Ocimax is described by two independent providers, which makes
-their disagreement rate a free drift detector — count the groups where they
-differ on `original_version?` and print it once per run. The same counter is
-what would make the matching rules safe to loosen further, so it is worth
-having before the next change to them. A stable rate means
-both are healthy; a jump, or a collapse to zero, means one of them has changed
-shape. This belongs in the run log, not in the Telegram digest: provider health
-is not something a subscriber should have to read about.
+**The end-to-end fixtures never exercise a cross-provider merge.** SensaCine's
+Ocimax fixture and Yelmo's cover different days, so `end_to_end_test.rb` has no
+screening both providers describe: the digest is byte-identical with and
+without the matching rules, and the agreement row it prints is all zeroes. The
+merge and agreement tests cover the behaviour directly, but a refreshed capture
+that overlapped would make the end-to-end test carry it too.
