@@ -3,9 +3,9 @@
 module VoCinema
   # One screening: which film, which day, what time, and whether it is the print
   # in the original language. Fully resolved when it is built, never mutated.
-  ScreeningSession = Data.define(:film, :date, :starts_at, :original_version?) do
-    # What makes two providers' records the same screening. Ocimax is listed by
-    # both SensaCine and Yelmo, and this is how their accounts are matched up.
-    def slot = [date, starts_at, film.key]
-  end
+  #
+  # Matching two providers' records of the same screening is Reconciliation's
+  # job: the day and the minute are read straight off here, and which film they
+  # describe is Film#same_film_as?.
+  ScreeningSession = Data.define(:film, :date, :starts_at, :original_version?)
 end

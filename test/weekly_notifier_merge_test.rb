@@ -125,11 +125,85 @@ class WeeklyNotifierMergeTest < ServiceTest
     assert_equal ["18:45", "21:15"], outbox.digest.times_listed_for("La constelación del perro").sort
   end
 
-  def test_providers_are_matched_up_by_day_time_and_title
-    # Yelmo bills the same screening as "…25 Aniversario", so the two records
-    # are not recognised as one. That is survivable: the dubbed SensaCine entry
-    # is filtered out on its own merits and Yelmo's subtitled one is kept, so
-    # the screening still reaches the digest exactly once — under Yelmo's name.
+  def test_a_marketing_suffix_does_not_make_it_a_different_film
+    # The 25th-anniversary Harry Potter at Ocimax. SensaCine bills it plainly,
+    # Yelmo puts the anniversary in the title, and both name Chris Columbus.
+    # One title is the other with a suffix on the end, so it is one film — and
+    # the digest prints the name without the marketing.
+    outbox = digest_from(
+      sensacine: [screening(film("Harry Potter y la Piedra Filosofal", year: 2001, director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: false)],
+      yelmo:     [screening(film("Harry Potter y la Piedra Filosofal 25 Aniversario", director: "Chris Columbus"),
+                            on: "2026-09-04", at: "17:00", original_version: true)]
+    )
+
+    assert_equal ["17:00"], outbox.digest.times_listed_for("Harry Potter y la Piedra Filosofal")
+    refute outbox.digest.mentions?("25 Aniversario")
+  end
+
+  def test_the_union_reaches_across_the_two_spellings
+    # The point of matching them up at all. SensaCine files this print under
+    # "dubbed"; only Yelmo knows it is subtitled, and only under its own
+    # spelling. Before the two records met, the positive had nothing to reach.
+    outbox = digest_from(
+      sensacine: [screening(film("Marsupilami", year: 2026, director: "Philippe Lacheau"),
+                            on: "2026-09-04", at: "18:45", original_version: false)],
+      yelmo:     [screening(film("Marsupilami 4K", director: "Philippe Lacheau"),
+                            on: "2026-09-04", at: "18:45", original_version: true)]
+    )
+
+    assert_equal ["18:45"], outbox.digest.times_listed_for("Marsupilami")
+  end
+
+  def test_a_director_yelmo_padded_with_a_stray_space_still_counts
+    # Yelmo writes "Will  Gluck" where SensaCine writes "Will Gluck". Two
+    # spaces is not a different person.
+    outbox = digest_from(
+      sensacine: [screening(film("Una noche al año", year: 2026, director: "Will Gluck"),
+                            on: "2026-09-04", at: "20:00", original_version: true)],
+      yelmo:     [screening(film("Una noche al año Reestreno", director: "Will  Gluck"),
+                            on: "2026-09-04", at: "20:00", original_version: false)]
+    )
+
+    assert_equal ["20:00"], outbox.digest.times_listed_for("Una noche al año")
+    refute outbox.digest.mentions?("Reestreno")
+  end
+
+  def test_a_shared_director_alone_does_not_merge_two_films
+    # A multiplex runs several screens at once, so two films starting at the
+    # same minute is ordinary. Sharing a director cannot be enough on its own:
+    # only a title billed as an extension of the other makes it one film.
+    outbox = digest_from(
+      sensacine: [screening(film("La constelación del perro", year: 2026, director: "Ridley Scott"),
+                            on: "2026-09-04", at: "21:15")],
+      yelmo:     [screening(film("Gladiator", year: 2000, director: "Ridley Scott"),
+                            on: "2026-09-04", at: "21:15")]
+    )
+
+    assert_equal ["21:15"], outbox.digest.times_listed_for("La constelación del perro")
+    assert_equal ["21:15"], outbox.digest.times_listed_for("Gladiator")
+  end
+
+  def test_two_directors_who_disagree_keep_their_films_apart
+    # A title that happens to extend another is not enough either. Both halves
+    # have to hold.
+    outbox = digest_from(
+      sensacine: [screening(film("Nosferatu", year: 1922, director: "F. W. Murnau"),
+                            on: "2026-09-04", at: "22:00")],
+      yelmo:     [screening(film("Nosferatu 2024", director: "Robert Eggers"),
+                            on: "2026-09-04", at: "22:00")]
+    )
+
+    assert_equal ["22:00"], outbox.digest.times_listed_for("Nosferatu 2024")
+    assert_equal 2, outbox.digest.text.scan("Nosferatu").length
+  end
+
+  def test_without_a_director_the_two_spellings_stay_two_films
+    # What the digest did before either provider's director was read, and what
+    # it still does when one of them will not name one. Survivable rather than
+    # correct: the dubbed SensaCine entry is filtered out on its own merits and
+    # Yelmo's subtitled one is kept, so the screening still reaches the digest
+    # once — under Yelmo's name, suffix and all.
     outbox = digest_from(
       sensacine: [screening(film("Harry Potter y la Piedra Filosofal", year: 2001),
                             on: "2026-09-04", at: "17:00", original_version: false)],
@@ -137,7 +211,6 @@ class WeeklyNotifierMergeTest < ServiceTest
                             on: "2026-09-04", at: "17:00", original_version: true)]
     )
 
-    assert outbox.digest.mentions?("Harry Potter y la Piedra Filosofal 25 Aniversario")
     assert_equal ["17:00"], outbox.digest.times_listed_for("Harry Potter y la Piedra Filosofal 25 Aniversario")
   end
 
