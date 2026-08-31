@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    csv (3.3.6)
     minitest (5.27.0)
     zeitwerk (2.8.3)
 
@@ -9,10 +10,12 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  csv (~> 3.3)
   minitest (~> 5)
   zeitwerk (~> 2.6)
 
 CHECKSUMS
+  csv (3.3.6) sha256=aba61e7e507a66f03d45cb1f3c4b6359861c3504038b422962875dce099e4456
   minitest (5.27.0) sha256=2d3b17f8a36fe7801c1adcffdbc38233b938eb0b4966e97a6739055a45fa77d5
   zeitwerk (2.8.3) sha256=2c85125a8467ce069e20123d1e709a08955c9d29c118c25b46b7b7fafdbb92e5
 

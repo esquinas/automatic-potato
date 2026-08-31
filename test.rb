@@ -32,6 +32,7 @@ require_relative "test/support/no_real_sleeping"
 require_relative "test/support/fixtures"
 require_relative "test/support/fake_http"
 require_relative "test/support/rendered_digest"
+require_relative "test/support/tee"
 require_relative "test/support/service_test"
 require_relative "test/support/fakes"
 

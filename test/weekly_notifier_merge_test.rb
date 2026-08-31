@@ -29,7 +29,8 @@ class WeeklyNotifierMergeTest < ServiceTest
   def digest_from(sensacine:, yelmo:, cinemas: [ocimax])
     outbox = Outbox.new
     WeeklyNotifier.new(
-      showtimes: [Listings.new(OCIMAX => sensacine), Listings.new(OCIMAX => yelmo)],
+      showtimes: [Listings.named("SensaCine", OCIMAX => sensacine),
+                  Listings.named("Yelmo", OCIMAX => yelmo)],
       movies_db: MovieDatabase.new, messenger: outbox, cinemas: cinemas
     ).run(today: MONDAY)
     outbox

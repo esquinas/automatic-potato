@@ -27,6 +27,10 @@ module VoCinema
         @cache = {}
       end
 
+      # How the run log names this provider when reporting what the providers
+      # disagreed about.
+      def name = "Yelmo"
+
       # Yelmo runs a handful of cinemas; it has nothing to say about the rest.
       def sessions_for(cinema, date)
         return [] unless cinema.yelmo_id
