@@ -52,9 +52,11 @@ lib/
       client.rb         # the only code that touches the network: retry, pacing, shared headers
     showtimes/
       sensacine.rb      # fetches a theatre-day, follows pagination
-      sensacine/day.rb  # reads one day's payload into ScreeningSessions
+      sensacine/day.rb  # reads one day's buckets and clock times into ScreeningSessions
+      sensacine/movie.rb# reads one entry's title, year and director into a Film
       yelmo.rb          # fetches a city once, caches it
-      yelmo/listing.rb  # reads one cinema's payload into ScreeningSessions by day
+      yelmo/listing.rb  # reads one cinema's formats and times into ScreeningSessions by day
+      yelmo/movie.rb    # reads one film's title and director into a Film
     movies/
       tmdb.rb           # original title, rating, and whether a film is a Spanish production
     digest/
@@ -76,7 +78,7 @@ test/
   **/*_test.rb          # mirrors lib/, plus end_to_end_test.rb
 .github/workflows/
   test.yml              # runs ruby test.rb on every pull request and on master
-  rubycritic.yml        # code quality gate on lib/ (minimum score 91)
+  rubycritic.yml        # code quality gate on lib/ (minimum score 92)
   weekly.yml            # Monday and Friday 11:00 Gijón cron + workflow_dispatch
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
@@ -272,6 +274,21 @@ fetchers know about URLs, pagination and caching; the readers know about
 buckets, language tags and timestamps and could not make a request if they
 wanted to. That split, plus moving every socket into `Http::Client`, is what
 took `lib/` from 89.96 to 92.19 on RubyCritic.
+
+**Naming a film is separate from timing it** — each reader is itself two
+classes: `Sensacine::Movie` and `Yelmo::Movie` answer with a `Film` (or `nil`
+for an entry the feed never named), while `Sensacine::Day` and `Yelmo::Listing`
+keep the buckets, language tags and clock. Naming a film means understanding
+quite different corners of a payload — SensaCine spreads the year over
+`movie.data` and `movie.releases[]` and buries the director in a flat credit
+list — and none of that has anything to do with when the film is on. The two
+providers now read the same shape, which is the point: a third would too.
+
+RubyCritic rates a file mostly on complexity, and the A/B line falls near 50,
+so what moves the score is splitting a file that does two jobs rather than
+chasing individual smells. Flog also multiplies nested blocks, so a block
+inside a block costs far more than the same work side by side — worth knowing
+before rewriting anything to satisfy the gate.
 
 **One HTTP client, one set of manners** — `Http::Client` is the only code in
 the project that touches `Net::HTTP`. It owns the retry, the pacing between

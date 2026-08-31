@@ -21,8 +21,7 @@ module VoCinema
       lend_known_years
 
       all.group_by { |session| [session.date, session.starts_at] }
-         .values
-         .flat_map { |at_one_minute| one_per_film(at_one_minute) }
+         .flat_map { |_minute, together| one_per_film(together) }
     end
 
     private
@@ -38,7 +37,8 @@ module VoCinema
     end
 
     def place(session, films)
-      group = films.find { |other| session.film.same_film_as?(other.first.film) }
+      film  = session.film
+      group = films.find { |other| film.same_film_as?(other.first.film) }
 
       group ? group << session : films << [session]
     end
@@ -79,14 +79,13 @@ module VoCinema
     # list reaches the digest as a second, yearless film of the same name —
     # printed twice, with the week's showtimes split between the two entries.
     def lend_known_years
-      films = all.map(&:film)
-      years = years_known_for(films)
-
-      films.each { |film| film.year ||= years[film.key] }
+      all.map(&:film).group_by(&:key).each_value { |sharing_a_title| lend_within(sharing_a_title) }
     end
 
-    def years_known_for(films)
-      films.group_by(&:key).transform_values { |sharing_a_title| sharing_a_title.map(&:year).compact.first }
+    def lend_within(films)
+      known = films.map(&:year).compact.first
+
+      films.each { |film| film.year ||= known }
     end
   end
 end
