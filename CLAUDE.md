@@ -42,10 +42,11 @@ lib/
   vo_cinema.rb          # sets up Zeitwerk; the only require_relative in the project
   vo_cinema/
     cinema.rb           # Data.define: one venue as config/cinemas.yml describes it
-    film.rb             # mutable PORO: localized_title + year always set; title filled after TMDB
+    film.rb             # mutable PORO: localized_title + director read from the feed; title filled after TMDB
     rating.rb           # Data.define with .null sentinel; to_s/to_str safe for interpolation
-    screening_session.rb# Data.define: film, date, starts_at, original_version?; #slot identifies a screening
+    screening_session.rb# Data.define: film, date, starts_at, original_version?
     cinema_listing.rb   # Data.define: one cinema's week, enriched and ready to print
+    reconciliation.rb   # pure: several providers' accounts of one week, read as one
     weekly_notifier.rb  # orchestrator: collect → enrich → render → send
     http/
       client.rb         # the only code that touches the network: retry, pacing, shared headers
@@ -163,7 +164,31 @@ Consequences, all of which are easy to get wrong:
 
 **Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
 
-Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `WeeklyNotifier#lend_known_years` closes that at merge time by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
+Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `Reconciliation#lend_known_years` closes that at merge time by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
+
+**Director:** `movie.credits[]` is a flat list of everyone who worked on the
+film, each entry tagged with the job it did:
+
+```json
+{ "person":   { "firstName": "Chris", "lastName": "Columbus", "internalId": 3474 },
+  "position": { "name": "DIRECTOR", "department": "DIRECTION" },
+  "rank": 1 }
+```
+
+It is the one substantive field both providers publish, which is what lets a
+film billed two different ways be matched — see *Matching a film across
+providers*. `bin/capture_fixtures.rb` keeps only the `DIRECTOR` entries, because
+the whole crew would bury a fixture but dropping the lot (as it used to) left no
+fixture able to exercise the matching.
+
+**An entry with no `movie.title` is dropped.** The feed carries some — the André
+Rieu concert at Ocimax is one — and they used to become a film called
+`"(untitled)"`, which TMDB happily answered with `"Untitled Immaculate
+Reception Film"`, so a concert would have reached subscribers under a stranger's
+name. There is nothing to print, look up or match on. Where another provider
+covers the same screening it arrives from there properly named, as that concert
+does from Yelmo; at a SensaCine-only venue the screening is lost, which is the
+accepted cost of not inventing one.
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
 
@@ -230,7 +255,7 @@ VOSE language tag. Saying "dubbed" is what a provider says when it has none,
 which is why SensaCine files Yelmo's subtitled prints that way, and why Yelmo
 labels a Spanish production `"ESPAÑOL"` when that print *is* the original. A
 negative is an absence of evidence; a positive is evidence. So
-`WeeklyNotifier#merge` unions the positives, and the whole pipeline reads the
+`Reconciliation#agreed` unions the positives, and the whole pipeline reads the
 same way at every level — `Sensacine::Day` ORs bucket against
 `diffusionVersion`, `#collect_sessions` ORs that against TMDB's
 `spanish_original?`, and the merge ORs across providers.
@@ -265,6 +290,17 @@ enriched. The split took `lib/` from 85.97 to 88.54 on RubyCritic, and — the
 part worth noticing — the test suite needed no edit at all, because it asserts
 on what the digest says rather than on how it is assembled.
 
+**Reconciling the providers is its own object** — `Reconciliation` takes the
+weeks the providers answered with and reads them as one, deciding which records
+describe the same film and which claims about a screening to believe. It went
+into a class of its own when the matching stopped being a `group_by` one-liner:
+the rules have real evidence behind them and want somewhere to be explained,
+and the notifier's job is to ask the providers and hand the answer on, not to
+adjudicate between them. It is pure and independent of the order the providers
+were given in, deliberately, so that adding a provider cannot silently change
+what a subscriber reads. `Film#same_film_as?` is the one piece that lives
+elsewhere: whether two records are the same film is the film's own business.
+
 **`Film` is a mutable PORO** — `title` starts `nil` and is filled after TMDB lookup. `Data.define` was rejected here because immutability would require propagating new instances across all `ScreeningSession` references that already hold the original `Film`.
 
 **`ScreeningSession` is `Data.define`** — fully resolved at construction time, never mutated.
@@ -285,38 +321,112 @@ on what the digest says rather than on how it is assembled.
 
 **`HttpClient` is a module, not a base class** — shared retry-with-jitter logic is included by `SensacineClient`, `TmdbClient` and `YelmoClient`. The module keeps it encapsulated without imposing an inheritance hierarchy. GET and POST differ only in the request they build, so they hand a block to one `with_one_retry`: attempt, pause, and on anything but a 200 attempt once more behind a much longer pause. The block builds a fresh request each time — a `Net::HTTP` request that has been on the wire once is not safe to send again.
 
-**A film is compared across providers by `Film#key`** — the localized title downcased and stripped, because SensaCine and Yelmo disagree about capitals and stray spaces. `ScreeningSession#slot` (`[date, starts_at, film.key]`) is built on it and is what `WeeklyNotifier#merge_sessions` groups by. Note that `Film#==` is stricter: it counts the year too, so `Nosferatu` 1922 and 2024 stay two films.
+**A film is compared across providers by `Film#same_film_as?`** — see *Matching a film across providers* below for the rule and the evidence behind it. Note that `Film#==` is different and stricter: it counts the year, so `Nosferatu` 1922 and 2024 stay two films, and it is what `films.uniq` and the ratings hash use once a week has already been reconciled.
 
 **`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+
+## Matching a film across providers
+
+Ocimax is described by both SensaCine and Yelmo, so the same screening arrives
+twice and has to be recognised as one. `Reconciliation` groups every session by
+`[date, starts_at]` — one cinema, one minute — and then asks
+`Film#same_film_as?` which of them describe the same film. A multiplex runs
+several screens at once, so two films starting at the same minute is ordinary
+and the film has to decide.
+
+### The rule
+
+1. **The titles match by `Film#key`** — downcased and stripped, because the two
+   providers disagree about capitals and stray spaces (`"La Odisea"` against
+   `"La odisea"`, `"…La Dino película"` against `"…La dino película"`). This
+   settles almost everything.
+2. **Otherwise the director rescues it** — when *both* providers name a
+   director, the names match once whitespace is squeezed, **and** one title is a
+   prefix of the other. That is what makes SensaCine's `"Harry Potter y la
+   Piedra Filosofal"` and Yelmo's `"…25 Aniversario"` one film.
+
+Both halves of rule 2 are load-bearing. A director alone is not enough — a
+director can have two films on at once — and a title that happens to extend
+another is not enough either. Together they are hard to trip over by accident.
+
+The director never *blocks* a match rule 1 already made. That matters: on a
+co-directed film the two providers can each pick a different name from the
+credits, and they do — SensaCine credits `Minions & Monsters` to Patrick Delage
+where Yelmo credits Pierre Coffin. Both are right, and the film still merges on
+its title.
+
+Whichever record wins, the digest prints the **shortest** title, because the
+records that needed rescuing differ by a marketing suffix and the name without
+it is the film's real one. Ties break alphabetically, which carries no meaning
+beyond settling `"La Sustancia"` against `"La sustancia"` the same way every
+run — a rule with an actual opinion about capitals is still wanted.
+
+### What the evidence says
+
+Two runs of `bin/probe_identity.rb` against the live providers, 30–31 August
+2026. Re-run it (the **Capture API fixtures** workflow, `provider=identity`)
+before changing any of this.
+
+- **A title cannot be repaired through TMDB.** `"Harry Potter y la Piedra
+  Filosofal 25 Aniversario"` and `"The Fast & The Furious 25 aniversario"` both
+  return **no results at all**. Worse, the one edition-suffixed title TMDB did
+  answer it answered wrongly: SensaCine's `"The Fast and the Furious (A todo
+  gas) - 25 Aniversario"` resolved to **`"Fast & Furious X"` (2023)**, past a
+  `year=2026` filter. Canonicalising on that id would have renamed the film in
+  the digest and merged it with the wrong one.
+- **TMDB adds nothing where it does work.** 15 films resolved to the same id
+  from both providers — and every one of those pairs differed only in capitals,
+  which `key` already handles. So the expensive option buys nothing the cheap
+  one does not.
+- **Neither provider publishes an id the other would recognise.** SensaCine
+  carries Allociné ids (`internalId`, plus a base64 `id`); Yelmo carries its own
+  `Id`, a slug `Key` and a Vista `VistaId`.
+- **The director is published by both, and agrees.** 11 of 12 comparable films
+  matched once whitespace was squeezed; the 12th was the co-director case above.
+  Yelmo pads some names with a double space (`"Will␣␣Gluck"`), which is why the
+  comparison squeezes rather than compares as written.
+- **What it buys, measured:** 9 screenings in that week at Ocimax failed to
+  group. 8 were Harry Potter, which the rule now fixes. The 9th was a concert
+  SensaCine listed with no title and no credits — nothing can match that, and
+  nothing should try.
+
+### Where to take it next
+
+In rough order of value for effort:
+
+- **Count the disagreements** (below) before loosening anything further. Without
+  it there is no way to tell a rule that helps from one that quietly merges
+  films that are not the same.
+- **Normalise punctuation before the prefix test.** The prefix test misses
+  `"The Fast and the Furious (A todo gas) - 25 Aniversario"` against `"The Fast
+  & The Furious 25 aniversario"` — `and` against `&`, plus a parenthetical.
+  Folding conjunctions, punctuation and accents would catch it. Brittle, so it
+  wants the disagreement counter first.
+- **A suffix vocabulary** (`25 Aniversario`, `Re-estreno`, `4K`, `VOSE`) stripped
+  before comparison would make the prefix test unnecessary rather than extending
+  it, and would fix the spelling that prints as a side effect. It needs a real
+  sample of suffixes to be worth writing; the probe collects one.
+- **SensaCine's `originalTitle`** is in the payload and currently unread. It may
+  make a TMDB request per film unnecessary, and it is a second cross-provider
+  signal — but Yelmo's `OriginalTitle` is empty, so on today's two providers it
+  can only help the TMDB search, not the matching.
+- **Runtime, not just an hour** — the ceiling on all of this is that
+  `[date, starts_at]` assumes two providers agree to the minute. They do today.
+  A provider that rounded, or listed a different screen's time, would break
+  every rule above; `RunTime`/`runtime` are published by both and would let a
+  looser time window stay safe.
 
 ## Known gaps
 
 Recorded rather than fixed, with enough context to pick up cold.
 
-**Identify a film canonically, not by its title.** `ScreeningSession#slot`
-matches providers on `[date, starts_at, film.key]`, and `key` is the localized
-title downcased and stripped. Providers spell the same film differently —
-Ocimax's Harry Potter is `"Harry Potter y la Piedra Filosofal"` on SensaCine
-and `"Harry Potter y la Piedra Filosofal 25 Aniversario"` on Yelmo — so those
-records never group, and the VO union never fires for them. The screening still
-reaches the digest under Yelmo's name, so nothing is lost today, but the
-reconciliation is narrower than it looks. TMDB is the only party that sees both
-spellings, so its `id` is the identifier available to us; whether its search
-really resolves both to one id is what `bin/probe_identity.rb` asks.
-
-**Reconcile the spelling of a film's title.** Once two records do group, the
-digest prints whichever provider's spelling won — `key` ignores case and
-surrounding space, so `"La Sustancia"` and `"La sustancia"` are the same film
-but only one of them prints. `WeeklyNotifier#agreed` currently takes the first
-record's film, which makes it a function of list order in the one place order
-still shows. It wants a rule of its own: TMDB's spelling, or the most common,
-or the shortest.
-
 **Log how often the providers disagree.** With the union rule a provider that
 quietly stops tagging VO is invisible: the others carry, and the digest just
 gets thinner. Ocimax is described by two independent providers, which makes
-their disagreement rate a free drift detector — count the slots where they
-differ on `original_version?` and print it once per run. A stable rate means
+their disagreement rate a free drift detector — count the groups where they
+differ on `original_version?` and print it once per run. The same counter is
+what would make the matching rules safe to loosen further, so it is worth
+having before the next change to them. A stable rate means
 both are healthy; a jump, or a collapse to zero, means one of them has changed
 shape. This belongs in the run log, not in the Telegram digest: provider health
 is not something a subscriber should have to read about.
