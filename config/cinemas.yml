@@ -1,3 +1,9 @@
+# Where the cinemas are, which is what "today" means to this service. A run
+# started at 00:45 in Gijón is on a UTC host still on yesterday's date, and
+# would ask for a day already spent and never ask about the last day of the
+# week. An IANA name, so the CET/CEST switch is tzdata's problem and not ours.
+timezone: "Europe/Madrid"
+
 cinemas:
   - name: "Yelmo Cines Ocimax Gijón"
     sensacine_id: "E0628"

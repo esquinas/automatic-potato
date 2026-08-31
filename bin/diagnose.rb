@@ -47,7 +47,7 @@ sensacine = VoCinema::Showtimes::Sensacine.new
 puts "Cinema: #{cinema.name} (#{cinema.sensacine_id})"
 
 VoCinema::WeeklyNotifier::WEEK_DAYS.times do |offset|
-  date     = (Date.today + offset).to_s
+  date     = (VoCinema::Clock.today + offset).to_s
   sessions = sensacine.sessions_for(cinema, date)
   original = sessions.count(&:original_version?)
 

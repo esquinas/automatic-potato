@@ -38,11 +38,12 @@ Each class reads its own secrets from ENV as default keyword arguments — plain
 ## Architecture
 
 ```
-Gemfile                 # zeitwerk (runtime), minitest (test)
+Gemfile                 # zeitwerk, csv, tzinfo (runtime), minitest (test)
 lib/
   vo_cinema.rb          # sets up Zeitwerk; the only require_relative in the project
   vo_cinema/
     cinema.rb           # Data.define: one venue as config/cinemas.yml describes it
+    clock.rb            # what day it is where the cinemas are, not where the process runs
     film.rb             # mutable PORO: localized_title + director read from the feed; title filled after TMDB
     rating.rb           # Data.define with .null sentinel; to_s/to_str safe for interpolation
     screening_session.rb# Data.define: film, date, starts_at, original_version?
@@ -77,7 +78,7 @@ bin/
   diagnose.rb           # token health check + live SensaCine probe
   capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
   probe_identity.rb     # asks how the providers name the same film
-config/cinemas.yml      # user-editable cinema list (name, provider ids, url, check_vo flag)
+config/cinemas.yml      # user-editable: the cinemas' timezone, then the list itself
 .mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
 test/
@@ -182,6 +183,15 @@ Consequences, all of which are easy to get wrong:
   without claiming it programmed nothing.
 - `test/fixtures/sensacine/nothing_left_that_day.json` was captured at 01:26
   local asking about the previous day, and records the behaviour.
+- **Which day is "day zero" is `Clock.today`, not `Date.today`.** `Date.today`
+  reads the timezone of whatever machine is running, and a GitHub runner is on
+  UTC — so a run started at 00:45 in Gijón saw *yesterday*: it asked for a day
+  whose programme had already been shown, never asked about the seventh day at
+  all, and headed the digest with a range off by one. The 11:00 cron never
+  noticed, because 09:00 and 10:00 UTC are the same calendar day as 11:00 in
+  Gijón; the 2026-08-31 preview run, fired at 22:45 UTC, did. `Clock` reads the
+  zone out of `config/cinemas.yml` and asks tzinfo, so the CET/CEST switch is
+  not this project's problem.
 
 **Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
 
@@ -325,6 +335,17 @@ without a single stub, and the notifier is free of every string of markup.
 enriched. The split took `lib/` from 85.97 to 88.54 on RubyCritic, and — the
 part worth noticing — the test suite needed no edit at all, because it asserts
 on what the digest says rather than on how it is assembled.
+
+**The timezone is configuration, and tzinfo owns the rules** — a service about
+cinemas in Gijón should not change its mind about what day it is depending on
+where the process runs, so `Clock` answers rather than `Date.today`. The zone
+lives in `config/cinemas.yml` beside the cinemas it describes, because pointing
+this at another city should be one file and not a code change; a config without
+it still runs, on the city the service was written for. Setting `TZ` on the
+workflow would have been one line and no dependency, but it fixes only the
+runner — a local run, or a second workflow someone adds later, would be wrong
+again and silently. tzinfo is a fourth dependency bought deliberately: hand-rolling
+"last Sunday in March" is correct only until the EU changes the rule.
 
 **Reconciling the providers is its own object** — `Reconciliation` takes the
 weeks the providers answered with and reads them as one, deciding which records
