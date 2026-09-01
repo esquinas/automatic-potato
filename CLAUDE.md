@@ -584,21 +584,22 @@ programme and put the rest on sale later, closer to the weekend — in which cas
 `overlapping` measures how much was **on sale when we asked**, not how much is
 on, and the Monday digest systematically under-reports the coming weekend.
 
-Two readings taken two days apart say exactly the same thing:
+Three readings taken over three days say exactly the same thing:
 
 | Asked on | Data through | First empty day | `nextDate` |
 |---|---|---|---|
 | 30 Aug (identity probe, run 33325096167) | Fri 4 Sep | Sat 5 Sep | **Thu 10 Sep** |
 | 1 Sep (preview, run 33449170994) | Fri 4 Sep | Sat 5 Sep | **Thu 10 Sep** |
+| 1 Sep, Tue noon (programme watch, run 33495396594) | Fri 4 Sep | Sat 5 Sep | **Thu 10 Sep** |
 
 A multiplex with no Saturday programme is not credible, so those empty days are
 almost certainly "not on sale yet" rather than "nothing on". `nextDate` naming a
 **Thursday** fits the Spanish release cycle, where the programme turns over
 Thursday or Friday.
 
-**The boundary did not move in those two days**, so it is not a gradual fill. If
-it fills, it happens at a moment — which is what makes a mid-week reading a test
-rather than another data point.
+**The boundary did not move across those readings**, so it is not a gradual
+fill. If it fills, it happens at a moment — which is what makes a mid-week
+reading a test rather than another data point.
 
 **The prediction, written before the test:** the Tuesday 1 September reading
 still shows *data through 4 Sep, next 10 Sep* (the control — it should match the
@@ -609,6 +610,17 @@ later or on another cadence. Recording the prediction first is what stops the
 result being rationalised afterwards; the `overlapping` guess for the baseline
 came out an order of magnitude low, and that was only visible because it had
 been written down.
+
+**The Tuesday control came in as predicted.** For `E0628`, 1–4 September each
+returned screenings (1 September over two pages, 2 and 3 September likewise),
+and 5, 6 and 7 September each returned `next.showtime.on` with
+`nextDate: 2026-09-10`. Identical to both earlier readings, boundary and
+`nextDate` alike, so the control holds and Wednesday is the real test. Ocine
+Premium Los Fresnos (`E2907`) reads the same shape one day shorter — data
+through Thursday 3 September, `nextDate: 2026-09-11` from the 4th on — which is
+a second venue on the same weekly cadence rather than an Ocimax quirk. The
+scheduled 10:00 UTC firing did not appear; this reading came from a manual
+dispatch at 10:03 UTC the same day, which is the same "before" point.
 
 **Programme watch** takes the readings: a dry run at noon on Tuesday and in the
 morning on Wednesday and Saturday. Tuesday is the "before" point, taken while
