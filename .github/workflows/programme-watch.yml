@@ -26,11 +26,12 @@ name: Programme watch
 # Delete this once the question is answered — it exists to settle a hypothesis,
 # not to run forever.
 
-# One cron, not the pair weekly.yml carries. There the exact local hour is
-# load-bearing — the digest has to go out before the day's first screening — so
-# it fires twice and drops the wrong twin. Here an hour of drift across the
-# CET/CEST switch changes nothing about what is on sale, so the twin would be
-# machinery for its own sake.
+# One firing per reading, not the twin weekly.yml carries. There the exact
+# local hour is load-bearing — the digest has to go out before the day's first
+# screening — so it fires twice and drops the wrong twin. Here an hour of drift
+# across the CET/CEST switch changes nothing about what is on sale, so the twin
+# would be machinery for its own sake. The two lines below are two different
+# days, not one reading covered twice.
 on:
   schedule:
     - cron: '0 10 * * 2'    # Tuesday noon Gijón — the "before" point, taken
