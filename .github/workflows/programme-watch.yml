@@ -1,0 +1,49 @@
+name: Programme watch
+
+# Reads the week without sending it, to answer one question: do the cinemas
+# publish their whole week at once, or a base programme they fill in later?
+#
+# It matters because the counter's `overlapping` measures how much was on sale
+# when we asked. Ocimax read `data through Friday, next showtime the following
+# Thursday` on both 30 August and 1 September 2026 — a multiplex with no
+# Saturday is not credible, so those days are almost certainly not on sale yet.
+# See "Does the programme fill in mid-week?" in CLAUDE.md.
+#
+# Wednesday and Saturday, so each week gives two readings between the Monday
+# and Friday digests. Comparing the same target dates across them is what shows
+# whether the window moves, and when.
+#
+# This cannot post: bin/preview.rb never builds a Telegram messenger, and the
+# step below is given no Telegram secrets. That is a property of the workflow
+# rather than a promise about the code.
+#
+# Delete this once the question is answered — it exists to settle a hypothesis,
+# not to run forever.
+
+# One cron, not the pair weekly.yml carries. There the exact local hour is
+# load-bearing — the digest has to go out before the day's first screening — so
+# it fires twice and drops the wrong twin. Here an hour of drift across the
+# CET/CEST switch changes nothing about what is on sale, so the twin would be
+# machinery for its own sake.
+on:
+  schedule:
+    - cron: '0 8 * * 3,6'   # 10:00 Gijón in CEST, 09:00 in CET; either will do
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      # The dates worth comparing between runs are the back half of the week:
+      # grep the log for `next.showtime.on` and see which day the window ends on.
+      - name: Read the week without sending it
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: ruby bin/preview.rb

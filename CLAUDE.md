@@ -91,6 +91,7 @@ test/
   weekly.yml            # Monday and Friday 11:00 Gijón cron; dispatch takes dry_run
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
+  programme-watch.yml   # Wed + Sat dry run; temporary, settles the fill-in question
 ```
 
 ### Naming conventions
@@ -618,10 +619,15 @@ prediction first is what stops the result being rationalised afterwards; the
 `overlapping` guess for the baseline came out an order of magnitude low, and
 that was only visible because it had been written down.
 
-Take the reading with `bin/preview.rb` through the **Weekly VO Cinema Notifier**
-workflow (`dry_run: true`) and compare, for theatre `E0628`, which dates return
-screenings and which return `next.showtime.on` with what `nextDate`. The dates
-to watch are **5–9 September**.
+**Programme watch** takes the readings: a dry run every Wednesday and Saturday,
+so each week gives two points between the Monday and Friday digests. Compare,
+for theatre `E0628`, which dates return screenings and which return
+`next.showtime.on` with what `nextDate`; the dates to watch first are **5–9
+September**. It carries no Telegram secrets and so cannot post.
+
+That workflow is **temporary** — it exists to settle this question, and should
+be deleted once the answer is written down here. Reading it by eye is the whole
+method; nothing is persisted, for the same reasons as the agreement block.
 
 If it is confirmed, two things follow. `WeeklyNotifier#closing_notes` says
 *"Nothing left to catch this week at: …"*, which for a venue whose programme is
