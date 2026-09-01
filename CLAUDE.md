@@ -91,6 +91,7 @@ test/
   weekly.yml            # Monday and Friday 11:00 Gijón cron; dispatch takes dry_run
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
+  programme-watch.yml   # Wed + Sat dry run; temporary, settles the fill-in question
 ```
 
 ### Naming conventions
@@ -159,8 +160,16 @@ Consequences, all of which are easy to get wrong:
   empty. The screenings existed; they have already been shown. Say that the
   programme has passed, or that there is nothing left to book.
 - **Judge an empty result by the clock.** Empty for *today* late in the day is
-  normal. Empty for a *future* day cannot be expiry, so that is the signal
-  worth alarming on.
+  normal: the programme has run. Empty for a *future* day cannot be expiry, but
+  it is not automatically a fault either — it has three causes and only one of
+  them is worth alarming on:
+  - **not on sale yet** — `next.showtime.on` naming a `nextDate` further ahead.
+    Ocimax reads this way for the back half of every week; see *Does the
+    programme fill in mid-week?* below.
+  - **no programme at all** — `no.showtime.error` with an empty `nextDate`, the
+    municipal venues' normal state.
+  - **actually wrong** — a non-200, an unparseable body, or a venue that
+    normally programmes going silent across a whole week.
 - **`error: true` with a `nextDate` is a healthy answer.** A non-200 or an
   unparseable body is not. Do not lump them together.
 - **There are two error messages, and only one carries a `nextDate`.**
@@ -574,6 +583,59 @@ valid CSV between markers: appending them to a file becomes a change to
 with no change to any code. `actions/cache` would be the wrong home — it evicts
 after 7 days of no access, and a health monitor that silently loses its baseline
 is worse than none.
+
+## Does the programme fill in mid-week?
+
+An open question, recorded with its evidence and a prediction, because the
+answer changes what the baseline above means.
+
+The 1 September reading looks like a quiet week at Ocimax: bookable screenings
+on four of seven days. The likelier reading is that the cinemas publish a base
+programme and put the rest on sale later, closer to the weekend — in which case
+`overlapping` measures how much was **on sale when we asked**, not how much is
+on, and the Monday digest systematically under-reports the coming weekend.
+
+Two readings taken two days apart say exactly the same thing:
+
+| Asked on | Data through | First empty day | `nextDate` |
+|---|---|---|---|
+| 30 Aug (identity probe, run 33325096167) | Fri 4 Sep | Sat 5 Sep | **Thu 10 Sep** |
+| 1 Sep (preview, run 33449170994) | Fri 4 Sep | Sat 5 Sep | **Thu 10 Sep** |
+
+A multiplex with no Saturday programme is not credible, so those empty days are
+almost certainly "not on sale yet" rather than "nothing on". `nextDate` naming a
+**Thursday** fits the Spanish release cycle, where the programme turns over
+Thursday or Friday.
+
+**The boundary did not move in those two days**, so it is not a gradual fill. If
+it fills, it happens at a moment — which is what makes a mid-week reading a test
+rather than another data point.
+
+**The prediction, written before the test:** a reading on Wednesday 2 September
+shows the window extending past Friday 4 Sep. If it still reads *data through
+4 Sep, next 10 Sep*, the theory is wrong as stated — either the week is
+genuinely thin, or the fill happens later or on another cadence. Recording the
+prediction first is what stops the result being rationalised afterwards; the
+`overlapping` guess for the baseline came out an order of magnitude low, and
+that was only visible because it had been written down.
+
+**Programme watch** takes the readings: a dry run every Wednesday and Saturday,
+so each week gives two points between the Monday and Friday digests. Compare,
+for theatre `E0628`, which dates return screenings and which return
+`next.showtime.on` with what `nextDate`; the dates to watch first are **5–9
+September**. It carries no Telegram secrets and so cannot post.
+
+That workflow is **temporary** — it exists to settle this question, and should
+be deleted once the answer is written down here. Reading it by eye is the whole
+method; nothing is persisted, for the same reasons as the agreement block.
+
+If it is confirmed, two things follow. `WeeklyNotifier#closing_notes` says
+*"Nothing left to catch this week at: …"*, which for a venue whose programme is
+merely unpublished is the same class of wording error as calling a drained day
+empty — it implies the screenings have been and gone. And a `programme` block
+beside the agreement one — per cinema, how many of the seven days carry a
+session, and the `nextDate` named when they do not — would make the fill visible
+run over run at no extra request cost.
 
 ## Known gaps
 
