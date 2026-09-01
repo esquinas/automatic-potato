@@ -1,25 +1,21 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Asks whether the director is a signal we can match films on across providers.
+# Asks how the two providers name the same film, so the matching rules in
+# CLAUDE.md ("Matching a film across providers") can be checked against live
+# data rather than argued about.
 #
-# The first run of this probe settled the earlier question: TMDB does NOT
-# recognise an edition-suffixed title. "Harry Potter y la Piedra Filosofal 25
-# Aniversario" and "The Fast & The Furious 25 aniversario" both come back with
-# no results at all, and the one suffixed title TMDB did answer — SensaCine's
-# "The Fast and the Furious (A todo gas) - 25 Aniversario" — it answered wrongly,
-# with "Fast & Furious X" (2023). So a title alone cannot identify a film, and
-# TMDB cannot be trusted to repair one.
+# Its first two runs are what those rules are built on, and their findings are
+# written up under "What the evidence says" — chiefly that TMDB cannot repair an
+# edition-suffixed title, and that the director is published by both providers
+# and agrees. Re-run this before loosening any of it; the section says so too.
 #
-# The director might. Yelmo publishes a clean "Director" per film ("Chris
-# Columbus"); SensaCine publishes a "credits" array that bin/capture_fixtures.rb
-# drops, so no fixture has ever shown its shape. This probe prints both sides so
-# three things can be decided:
+# What it prints, in order:
 #
 #   1. how the director is marked inside SensaCine's credits;
 #   2. whether the two providers spell a director's name the same way;
-#   3. whether credits are populated at all on re-releases and odd entries —
-#      the films that need the help.
+#   3. which screenings still fail to group at a minute both providers report on
+#      — the population any new rule would have to earn its keep on.
 #
 # Run it through the "Capture API fixtures" workflow with provider=identity.
 # Read-only: it asks the providers and prints what they said.
@@ -162,10 +158,11 @@ puts "\n#{agreed} film(s) both providers spell identically also agree on the dir
 # ---------------------------------------------------------------------------
 section "The films that fail to group — would the director rescue them?"
 
-# The previous probe paired every SensaCine screening with every Yelmo screening
-# at the same minute, which counted two different films in two screens as a
-# failure to group. This asks the real question: at this minute, which titles
-# does one provider list that the other does not match by key?
+# A multiplex runs several screens at once, so two different films starting at
+# the same minute is ordinary rather than a failure to group — pairing every
+# SensaCine screening with every Yelmo one at a minute would count those as
+# failures and drown the real signal. The question is narrower: at this minute,
+# which titles does one provider list that the other does not match by key?
 unmatched = 0
 
 slots.sort.each do |(date, time), sides|

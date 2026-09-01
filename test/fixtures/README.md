@@ -26,8 +26,12 @@ Captured 2026-08-28 from `GET /_/showtimes/theater-{id}/d-{date}/`.
 **`error: true` means expired, not absent.** SensaCine lists only screenings
 you could still buy a ticket for, so a day drains as its programme runs and is
 empty once the last film has started. How much of a day you see therefore
-depends on what time of day you ask. Treat an empty result for *today* as
-normal and an empty result for a *future* day as suspicious.
+depends on what time of day you ask.
+
+An empty *future* day is not a fault either — most often it means "not on sale
+yet", and the venues with no film programme at all answer `no.showtime.error`
+every day of the week. See *An empty day means expired, not absent* in
+`CLAUDE.md` for how to tell the benign cases from a real one.
 
 Note on provenance: in the week these were captured, no cinema in Gijón had a
 single showtime outside the `dubbed` buckets, so `laboral_original_version.json`

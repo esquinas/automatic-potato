@@ -1,6 +1,6 @@
 # Gijón VO Cinema Weekly Notifier
 
-A Ruby script that queries SensaCine's internal JSON API weekly for non-dubbed screenings in Gijón, enriches results with TMDB ratings, and delivers a Telegram digest on Monday and Friday mornings.
+A Ruby script that asks two cinema listings — SensaCine and Yelmo, both internal JSON APIs — for the week's non-dubbed screenings in Gijón, reconciles what they say into one programme, enriches it with TMDB ratings, and delivers a Telegram digest on Monday and Friday mornings.
 
 ## Git workflow
 
@@ -91,7 +91,7 @@ test/
   weekly.yml            # Monday and Friday 11:00 Gijón cron; dispatch takes dry_run
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
-  programme-watch.yml   # Wed + Sat dry run; temporary, settles the fill-in question
+  programme-watch.yml   # Tue/Wed/Sat dry run; temporary, settles the fill-in question
 ```
 
 ### Naming conventions
@@ -117,7 +117,7 @@ VoCinema::WeeklyNotifier.new(
   movies_db: Movies::Tmdb.new,
   messenger: Messengers::Telegram.new,
   cinemas:   Cinema.all
-).run(today: Date.today)
+).run   # today: defaults to Clock.today — the cinemas' date, never Date.today
 ```
 
 Every provider is asked about every cinema and answers with nothing for a venue
@@ -159,50 +159,41 @@ Consequences, all of which are easy to get wrong:
 - **Never word output as "no sessions"** for a day or venue that came back
   empty. The screenings existed; they have already been shown. Say that the
   programme has passed, or that there is nothing left to book.
-- **Judge an empty result by the clock.** Empty for *today* late in the day is
-  normal: the programme has run. Empty for a *future* day cannot be expiry, but
-  it is not automatically a fault either — it has three causes and only one of
-  them is worth alarming on:
-  - **not on sale yet** — `next.showtime.on` naming a `nextDate` further ahead.
-    Ocimax reads this way for the back half of every week; see *Does the
-    programme fill in mid-week?* below.
-  - **no programme at all** — `no.showtime.error` with an empty `nextDate`, the
-    municipal venues' normal state.
-  - **actually wrong** — a non-200, an unparseable body, or a venue that
-    normally programmes going silent across a whole week.
-- **`error: true` with a `nextDate` is a healthy answer.** A non-200 or an
-  unparseable body is not. Do not lump them together.
-- **There are two error messages, and only one carries a `nextDate`.**
-  `next.showtime.on` is the day-has-drained answer described above and names the
-  next date. `no.showtime.error` comes back with an *empty* `nextDate` and means
-  something else: this venue has no film programme at all. The municipal centres
-  (`G02E8`, `G02E9`, `G02GD`) answer that way every day of the week — they
-  screen films only occasionally, and SensaCine lists them regardless. Both are
-  benign, so an empty `nextDate` is not on its own a fault; what would be worth
-  alarming on is `no.showtime.error` from a venue that normally programmes, or
-  a message that is neither of these two. Observed on the 2026-08-31 preview run.
-- The cron fires at 11:00 in Gijón, ahead of the day's first screening (the
-  earliest seen at Ocimax is 16:00), so day zero reaches subscribers whole. It
-  used to fire at 16:00 local, which silently dropped every matinee. GitHub's
-  cron is UTC only and Gijón changes offset twice a year, so `weekly.yml` fires
-  at both 09:00 and 10:00 UTC and drops whichever one is not 11:00 locally.
-- The digest says so out loud rather than implying a complete day:
-  `WeeklyNotifier#closing_notes` ends every message with a line explaining that
-  today lists only what is still to come, and names a venue with nothing left
-  without claiming it programmed nothing.
-- `test/fixtures/sensacine/nothing_left_that_day.json` was captured at 01:26
-  local asking about the previous day, and records the behaviour.
-- **Which day is "day zero" is `Clock.today`, not `Date.today`.** `Date.today`
-  reads the timezone of whatever machine is running, and a GitHub runner is on
-  UTC — so a run started at 00:45 in Gijón saw *yesterday*: it asked for a day
-  whose programme had already been shown, never asked about the seventh day at
-  all, and headed the digest with a range off by one. The 11:00 cron never
-  noticed, because 09:00 and 10:00 UTC are the same calendar day as 11:00 in
-  Gijón; the 2026-08-31 preview run, fired at 22:45 UTC, did. `Clock` reads the
-  zone out of `config/cinemas.yml` and asks tzinfo, so the CET/CEST switch is
-  not this project's problem.
+- **Judge an empty result by the clock, and by which error came back.** Empty
+  for *today* late in the day is expiry. Empty for a *future* day cannot be, but
+  is still usually benign — there are exactly two error messages, and they mean
+  different things:
+  - `next.showtime.on`, **with** a `nextDate` — **not on sale yet** (or, for
+    today, already shown). Ocimax reads this way for the back half of every
+    week; see *Does the programme fill in mid-week?* below.
+  - `no.showtime.error`, with an **empty** `nextDate` — **no film programme at
+    all.** The municipal centres (`G02E8`, `G02E9`, `G02GD`) answer this way
+    every day; they screen films only occasionally and SensaCine lists them
+    regardless.
 
-**Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. `SensacineClient` used to read `movie.release.year`, which the feed does not have, so `Film#year` was `nil` for every SensaCine film and every match was looser than intended. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
+  So `error: true` is a healthy answer either way, and an empty `nextDate` is
+  not on its own a fault. What is worth alarming on: a non-200, an unparseable
+  body, a message that is neither of these two, or `no.showtime.error` from a
+  venue that normally programmes.
+- **Which day is "day zero" is `Clock.today`, not `Date.today`.** `Date.today`
+  reads the timezone of the machine running, and a GitHub runner is on UTC — so
+  a run just after midnight in Gijón asks about yesterday, never asks about the
+  seventh day, and heads the digest with a range off by one. The 11:00 cron
+  cannot trip this (09:00 and 10:00 UTC are the same calendar day as 11:00 in
+  Gijón), which is exactly why a manual run late in the evening is what found
+  it. `Clock` reads the zone from `config/cinemas.yml` and asks tzinfo.
+- The cron fires at 11:00 in Gijón, ahead of the day's first screening (the
+  earliest seen at Ocimax is 16:00), so day zero reaches subscribers whole.
+  GitHub's cron is UTC only and Gijón changes offset twice a year, so
+  `weekly.yml` fires at both 09:00 and 10:00 UTC and drops whichever one is not
+  11:00 locally.
+- The digest says so out loud rather than implying a complete day:
+  `Digest::Renderer#closing_notes` ends every message with a line explaining
+  that today lists only what is still to come, and names a venue with nothing
+  left without claiming it programmed nothing.
+- `test/fixtures/sensacine/nothing_left_that_day.json` records the behaviour.
+
+**Release year:** the year lives at `movie.data.productionYear` — that is the year TMDB files a film under, and it is what narrows the TMDB search. There is no `movie.release.year`, whatever the shape suggests. An entry without a production year falls back to the earliest date under `movie.releases[]` (`releaseDate.date`, `YYYY-MM-DD`), and a film the feed dates nowhere still gets listed — TMDB is simply asked about it without the year filter.
 
 Only SensaCine dates a film; Yelmo's payload carries no year at all. Since `Film#==` counts the year, the same film from the two providers would otherwise be two films — printed twice at Ocimax with its week split between the entries. `Reconciliation::SharedYears` closes that before anything is grouped, by giving Yelmo's copy the year SensaCine knows for the same title, which also buys the Yelmo-only screenings a narrowed TMDB search.
 
@@ -222,12 +213,12 @@ the whole crew would bury a fixture but dropping the lot (as it used to) left no
 fixture able to exercise the matching.
 
 **An entry with no `movie.title` is dropped.** The feed carries some — the André
-Rieu concert at Ocimax is one — and they used to become a film called
-`"(untitled)"`, which TMDB happily answered with `"Untitled Immaculate
-Reception Film"`, so a concert would have reached subscribers under a stranger's
-name. There is nothing to print, look up or match on. Where another provider
-covers the same screening it arrives from there properly named, as that concert
-does from Yelmo; at a SensaCine-only venue the screening is lost, which is the
+Rieu concert at Ocimax is one. Never substitute a placeholder: `"(untitled)"`
+was one once, and TMDB answered it with `"Untitled Immaculate Reception Film"`,
+which would have put a concert in front of subscribers under a stranger's name.
+There is nothing to print, look up or match on. Where another provider covers
+the same screening it arrives from there properly named, as that concert does
+from Yelmo; at a SensaCine-only venue the screening is lost, which is the
 accepted cost of not inventing one.
 
 The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~2021). Do not use it.
@@ -237,9 +228,16 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 1. Search by Spanish title + year (`/3/search/movie?query=...&year=...&language=es-ES`).
 2. If the top result has zero votes, return `Rating.null`.
 3. If top two results have rating ratio < 2×, return `Rating.null` (ambiguous match — no rating shown).
-4. No cache: ~10 films/week is well within TMDB free tier (50 req/s).
+4. Every search is cached for the life of the client, keyed by `[title, year]`.
 
-`TmdbClient` exposes three pure queries: `fetch_original_title(film)`, `rating_for(film)`, and `spanish_original?(film)` (`original_language == "es"` on the top search result). Mutation (`film.title =`) stays in `WeeklyNotifier`.
+`Movies::Tmdb` exposes three pure queries: `fetch_original_title(film)`, `rating_for(film)`, and `spanish_original?(film)` (`original_language == "es"` on the top search result). Mutation (`film.title =`) stays in `WeeklyNotifier`.
+
+The cache is not about the rate limit — ~10 films a week is nowhere near TMDB's
+50 req/s. It is that `fetch_original_title` and `spanish_original?` ask the
+*same* query, and the notifier asks per screening rather than per film, so the
+identical request went out two or three times over. A client is built once per
+run, which makes it the right lifetime for the answers; nothing survives the
+process, so a rating is never served stale.
 
 ## Tests
 
@@ -269,19 +267,18 @@ log between `===== BEGIN fixture: … =====` markers; see
 
 ## Design decisions
 
-**One film's timetable is its own object** — `Timetable` takes a film's
+**One film's timetable is its own object** — `Digest::Timetable` takes a film's
 sessions and lays them out: grouped by day, right-aligned into a column, and
 collapsed to a single "All week" line when the film shows every day. It emits
-plain text and knows nothing about Telegram markup, so `DigestRenderer` keeps
+plain text and knows nothing about Telegram markup, so `Digest::Renderer` keeps
 deciding how the digest is dressed and stops having to know how a column of
-times is squared up. The extraction is what took `DigestRenderer` off a C
-rating; as with the split below, the test suite needed no edit.
+times is squared up.
 
-**Each messenger owns its medium's constraints** — `TelegramMessenger` holds
+**Each messenger owns its medium's constraints** — `Messengers::Telegram` holds
 the 4096-character limit (enforced at 3800 with a "truncated" marker) because
-that ceiling is a fact about Telegram, not about the digest; `StdoutMessenger`
+that ceiling is a fact about Telegram, not about the digest; `Messengers::Stdout`
 strips the markup, because a terminal cannot use `<b>` and `<pre>`.
-`DigestRenderer` writes one digest in Telegram's flavour and hands it over
+`Digest::Renderer` writes one digest in Telegram's flavour and hands it over
 whole, knowing nothing about where it goes. That keeps a local run readable
 and stops a terminal digest being cut short for a limit that does not apply to
 it. Adding a second renderer per channel was considered and rejected: with one
@@ -295,9 +292,9 @@ VOSE language tag. Saying "dubbed" is what a provider says when it has none,
 which is why SensaCine files Yelmo's subtitled prints that way, and why Yelmo
 labels a Spanish production `"ESPAÑOL"` when that print *is* the original. A
 negative is an absence of evidence; a positive is evidence. So
-`Reconciliation#agreed` unions the positives, and the whole pipeline reads the
-same way at every level — `Sensacine::Day` ORs bucket against
-`diffusionVersion`, `#collect_sessions` ORs that against TMDB's
+`Reconciliation::Match#session` unions the positives, and the whole pipeline
+reads the same way at every level — `Sensacine::Day` ORs bucket against
+`diffusionVersion`, `WeeklyNotifier#surviving` ORs that against TMDB's
 `spanish_original?`, and the merge ORs across providers.
 
 The cost is accepted deliberately: a dubbed screening can reach the digest on
@@ -310,8 +307,7 @@ makes requests (`Showtimes::Sensacine`, `Showtimes::Yelmo`) and one that turns
 a payload into `ScreeningSession`s (`Sensacine::Day`, `Yelmo::Listing`). The
 fetchers know about URLs, pagination and caching; the readers know about
 buckets, language tags and timestamps and could not make a request if they
-wanted to. That split, plus moving every socket into `Http::Client`, is what
-took `lib/` from 89.96 to 92.19 on RubyCritic.
+wanted to.
 
 **Naming a film is separate from timing it** — each reader is itself two
 classes: `Sensacine::Movie` and `Yelmo::Movie` answer with a `Film` (or `nil`
@@ -322,10 +318,13 @@ quite different corners of a payload — SensaCine spreads the year over
 list — and none of that has anything to do with when the film is on. The two
 providers now read the same shape, which is the point: a third would too.
 
-RubyCritic rates a file mostly on complexity, and the A/B line falls near 50,
-so what moves the score is splitting a file that does two jobs rather than
-chasing individual smells. Flog also multiplies nested blocks, so a block
-inside a block costs far more than the same work side by side — worth knowing
+**How to move the RubyCritic score**, learned from the three splits above, each
+of which bought two to three points: the score is the average of the files'
+ratings, and a file is rated mostly on complexity with the A/B line near 50. So
+what moves it is splitting a file that does two jobs into two files that each do
+one — chasing individual smells inside a file does almost nothing, and adding
+methods to a file only adds cost. Flog also multiplies nested blocks, so a block
+inside a block costs far more than the same work side by side. Worth knowing
 before rewriting anything to satisfy the gate.
 
 **One HTTP client, one set of manners** — `Http::Client` is the only code in
@@ -337,13 +336,13 @@ in a way the service never would.
 
 **Rendering is separate from orchestrating** — `WeeklyNotifier` talks to the
 providers, decides which screenings survive, and enriches each film;
-`DigestRenderer` turns the result into text and asks nobody anything. The
+`Digest::Renderer` turns the result into text and asks nobody anything. The
 renderer is a pure function of its input, so the digest can be reasoned about
 without a single stub, and the notifier is free of every string of markup.
 `CinemaListing` is what passes between them: one venue's week, already
-enriched. The split took `lib/` from 85.97 to 88.54 on RubyCritic, and — the
-part worth noticing — the test suite needed no edit at all, because it asserts
-on what the digest says rather than on how it is assembled.
+enriched. Every split in this section left the test suite untouched, which is
+the point of asserting on what the digest says rather than on how it is
+assembled — it is what makes the next refactor cheap.
 
 **The timezone is configuration, and tzinfo owns the rules** — a service about
 cinemas in Gijón should not change its mind about what day it is depending on
@@ -372,25 +371,25 @@ elsewhere: whether two records are the same film is the film's own business.
 
 **`ScreeningSession` is `Data.define`** — fully resolved at construction time, never mutated.
 
-**`original_version?` resolved by the client** — `VO_BUCKETS.include?(bucket)` lives in `SensacineClient`. Domain objects stay free of provider-specific string vocabulary (`"original"`, `"local"`, `"dubbed"`).
+**`original_version?` resolved by the reader** — `VO_BUCKETS.include?(bucket)` lives in `Sensacine::Day`, and the `VO_LANGUAGES` tags in `Yelmo::Listing`. Domain objects stay free of provider-specific string vocabulary (`"original"`, `"local"`, `"dubbed"`).
 
-**Spanish-original films fall back to a TMDB check in `WeeklyNotifier`** — a Spanish production is never dubbed or subtitled, so no provider (`SensacineClient`'s buckets, `YelmoClient`'s `VO_LANGUAGES` tags) ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `WeeklyNotifier#collect_sessions` asks `TmdbClient#spanish_original?(film)` before excluding it, and keeps the session if the film's TMDB `original_language` is `"es"`. Results are memoized per `Film` for the run to avoid redundant TMDB calls across the week's sessions.
+**A provider never filters, it only reports** — `sessions_for(cinema, date)` returns every session it found with `original_version?` already set, and `WeeklyNotifier#surviving` is what drops the dubbed ones when the venue's `check_vo` says to. That keeps each provider a pure data source and puts the one policy decision in one place.
 
-**`fetch_theater_movie_sessions` takes no filter arg** — the client always returns all sessions with `original_version?` set. The caller (`WeeklyNotifier`) filters with `.select(&:original_version?)` when `check_vo` is true. This keeps the client a pure data source.
+**Spanish-original films fall back to a TMDB check** — a Spanish production is never dubbed or subtitled, so no provider ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `WeeklyNotifier#surviving` asks `Movies::Tmdb#spanish_original?(film)` before excluding it, and keeps the session if TMDB's `original_language` is `"es"`. The repeated asking costs nothing: `Movies::Tmdb` caches its own searches, so the notifier keeps no lookup table of its own.
 
 **`Rating` is a NullObject** — `Rating.null` returns a frozen instance with `score: nil`. Both present and null ratings implement `to_s` / `to_str`, so callers push them into a parts array and call `.join(" ").strip` — no conditionals, no `nil` checks. `Rating.null.to_s` returns `""`, which `strip` absorbs silently. `to_str` enables implicit coercion in `String#+` and `Array#join`.
 
-**Command-query separation on `TmdbClient`** — `fetch_original_title` and `rating_for` are pure queries. Mutation (`film.title =`) stays in `WeeklyNotifier`, which owns the enrichment lifecycle.
+**Command-query separation on `Movies::Tmdb`** — `fetch_original_title`, `rating_for` and `spanish_original?` are pure queries. Mutation (`film.title =`) stays in `WeeklyNotifier`, which owns the enrichment lifecycle.
 
-**Unified constructor signatures** — all `*Client` and `*Messenger` classes share the same call site: plain `.new`. Classes that need no config (`SensacineClient`, `StdoutMessenger`) declare `def initialize(**) = nil` to accept and silently discard any kwargs, keeping the interface consistent for callers that pass options uniformly.
+**Unified constructor signatures** — every provider, movie database and messenger shares the same call site: plain `.new`, with collaborators and secrets as defaulted keyword arguments. `Messengers::Stdout`, which needs no config at all, declares `def initialize(**) = nil` to accept and discard any kwargs, so a caller passing options uniformly does not have to special-case it.
 
 **`DOMAIN` constant per class** — base URL extracted to the top of each file. Renaming a service is a single-line edit, and derived strings (headers, paths) reference `DOMAIN` via interpolation so they update automatically.
 
-**`HttpClient` is a module, not a base class** — shared retry-with-jitter logic is included by `SensacineClient`, `TmdbClient` and `YelmoClient`. The module keeps it encapsulated without imposing an inheritance hierarchy. GET and POST differ only in the request they build, so they hand a block to one `with_one_retry`: attempt, pause, and on anything but a 200 attempt once more behind a much longer pause. The block builds a fresh request each time — a `Net::HTTP` request that has been on the wire once is not safe to send again.
+**`Http::Client` is a collaborator, not a superclass or a mixin** — every class that talks to a service takes one as `http:` and defaults it to a fresh instance with its own `HEADERS`. Inheritance and a mixin were both rejected: this way the network is injectable for tests without any of them naming a method the project owns, and `bin/` can build one directly. GET and POST differ only in the request they build, so they hand a block to one `with_one_retry`: attempt, pause, and on anything but a 200 attempt once more behind a much longer pause. The block builds a fresh request each time — a `Net::HTTP` request that has been on the wire once is not safe to send again.
 
 **A film is compared across providers by `Film#same_film_as?`** — see *Matching a film across providers* below for the rule and the evidence behind it. Note that `Film#==` is different and stricter: it counts the year, so `Nosferatu` 1922 and 2024 stay two films, and it is what `films.uniq` and the ratings hash use once a week has already been reconciled.
 
-**`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `StdoutMessenger`, a future `ImdbClient`) plugs in without changing the orchestrator.
+**`WeeklyNotifier` uses generic dependency names** — `showtimes:`, `movies_db:`, `messenger:` rather than `sensacine:`, `tmdb:`, `telegram:`. Any conforming implementation (e.g. `Messengers::Stdout`, a future non-TMDB movie database) plugs in without changing the orchestrator.
 
 ## Matching a film across providers
 
@@ -482,13 +481,11 @@ before changing any of this.
 
 ### Where to take it next
 
-In rough order of value for effort:
-
-The counter that used to head this list now exists, and the baseline it took is
-in *Reading the agreement block* below. Measure against it: any change here
-should move `by_director` or `unmatched` in a way you predicted before running
-it. Loosening also makes non-transitivity easier to hit, and the sort only
-settles *which* way it resolves, not whether the resolution is right.
+In rough order of value for effort. Before changing any of it: predict what the
+change does to `by_director` and `unmatched` in the agreement block, then check
+against the baseline in *Reading the agreement block* below. Loosening the rule
+also makes non-transitivity easier to hit, and the sort only settles *which* way
+that resolves, not whether the resolution is right.
 
 - **Normalise punctuation before the prefix test.** The prefix test misses
   `"The Fast and the Furious (A todo gas) - 25 Aniversario"` against `"The Fast
@@ -527,14 +524,6 @@ run_on,cinema,overlapping,disagreed,sole_vo_source,by_title,by_director,unmatche
 `bin/preview.rb` through the **Weekly VO Cinema Notifier** workflow
 (`dry_run: true`). Take the reading again the same way; it prints the digest
 too, and cannot post.
-
-It was read twice: once before `Clock` existed, when the run asked about
-2026-08-31 → 09-06, and again after, asking 09-01 → 09-07. **Every count came
-out the same**, because Ocimax answered `next.showtime.on` for 5, 6 and 7
-September — so the day the bug wrongly included was already spent and the day
-it wrongly dropped had nothing to book. The window was wrong and the
-measurement happened not to be, which is luck rather than reassurance: a week
-with programme on its last day would have differed.
 
 - `overlapping` — screenings more than one provider described. Only these can
   be disagreed about, so they are the denominator; a venue with one provider
@@ -611,17 +600,21 @@ Thursday or Friday.
 it fills, it happens at a moment — which is what makes a mid-week reading a test
 rather than another data point.
 
-**The prediction, written before the test:** a reading on Wednesday 2 September
-shows the window extending past Friday 4 Sep. If it still reads *data through
-4 Sep, next 10 Sep*, the theory is wrong as stated — either the week is
-genuinely thin, or the fill happens later or on another cadence. Recording the
-prediction first is what stops the result being rationalised afterwards; the
-`overlapping` guess for the baseline came out an order of magnitude low, and
-that was only visible because it had been written down.
+**The prediction, written before the test:** the Tuesday 1 September reading
+still shows *data through 4 Sep, next 10 Sep* (the control — it should match the
+two above), and the Wednesday 2 September one shows the window extending past
+Friday 4 Sep. If Wednesday still reads *through 4 Sep, next 10 Sep*, the theory
+is wrong as stated — either the week is genuinely thin, or the fill happens
+later or on another cadence. Recording the prediction first is what stops the
+result being rationalised afterwards; the `overlapping` guess for the baseline
+came out an order of magnitude low, and that was only visible because it had
+been written down.
 
-**Programme watch** takes the readings: a dry run every Wednesday and Saturday,
-so each week gives two points between the Monday and Friday digests. Compare,
-for theatre `E0628`, which dates return screenings and which return
+**Programme watch** takes the readings: a dry run at noon on Tuesday and in the
+morning on Wednesday and Saturday. Tuesday is the "before" point, taken while
+the window is known to end on the Friday; Wednesday brackets the moment the
+fill is suspected to happen; Saturday says whether it kept moving. Compare, for
+theatre `E0628`, which dates return screenings and which return
 `next.showtime.on` with what `nextDate`; the dates to watch first are **5–9
 September**. It carries no Telegram secrets and so cannot post.
 
@@ -629,7 +622,7 @@ That workflow is **temporary** — it exists to settle this question, and should
 be deleted once the answer is written down here. Reading it by eye is the whole
 method; nothing is persisted, for the same reasons as the agreement block.
 
-If it is confirmed, two things follow. `WeeklyNotifier#closing_notes` says
+If it is confirmed, two things follow. `Digest::Renderer#closing_notes` says
 *"Nothing left to catch this week at: …"*, which for a venue whose programme is
 merely unpublished is the same class of wording error as calling a drained day
 empty — it implies the screenings have been and gone. And a `programme` block
