@@ -9,9 +9,15 @@ name: Programme watch
 # Saturday is not credible, so those days are almost certainly not on sale yet.
 # See "Does the programme fill in mid-week?" in CLAUDE.md.
 #
-# Wednesday and Saturday, so each week gives two readings between the Monday
-# and Friday digests. Comparing the same target dates across them is what shows
+# Tuesday noon, Wednesday morning and Saturday morning. Tuesday and Wednesday
+# bracket the moment the fill is suspected to happen; Saturday says whether it
+# kept moving. Comparing the same target dates across them is what shows
 # whether the window moves, and when.
+#
+# GitHub runs scheduled workflows on a best-effort basis and the top of the
+# hour is its busiest slot, so a firing can be late or skipped. That is
+# survivable here: the readings are a series, and a missed one costs resolution
+# rather than the answer.
 #
 # This cannot post: bin/preview.rb never builds a Telegram messenger, and the
 # step below is given no Telegram secrets. That is a property of the workflow
@@ -27,6 +33,8 @@ name: Programme watch
 # machinery for its own sake.
 on:
   schedule:
+    - cron: '0 10 * * 2'    # Tuesday noon Gijón — the "before" point, taken
+                            # while the window is known to end on the Friday
     - cron: '0 8 * * 3,6'   # 10:00 Gijón in CEST, 09:00 in CET; either will do
   workflow_dispatch:
 
