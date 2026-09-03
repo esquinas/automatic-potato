@@ -52,7 +52,7 @@ class ClockTest < ServiceTest
   end
 
   def test_a_config_with_no_timezone_still_runs
-    # A missing line should not cost a Monday digest.
+    # A missing line should not cost a Wednesday digest.
     assert_equal "Europe/Madrid", Clock.name(config_saying("cinemas: []\n"))
   end
 

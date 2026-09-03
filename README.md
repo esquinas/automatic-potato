@@ -2,7 +2,7 @@
 
 <img src="assets/logo.png" alt="VOSE" width="48" height="48" style="vertical-align: middle; margin-right: 0.5em;">
 
-Queries SensaCine's internal JSON API for original-version screenings across Gijón's cinemas, enriches each film with its TMDB rating, and delivers a formatted digest to Telegram. **Executes automatically every Monday and Friday at 11:00 Gijón time via GitHub Actions.** Cinemas are configured in `config/cinemas.yml`.
+Queries SensaCine's internal JSON API for original-version screenings across Gijón's cinemas, enriches each film with its TMDB rating, and delivers a formatted digest to Telegram. **Executes automatically every Wednesday and Friday around noon Gijón time via GitHub Actions.** Cinemas are configured in `config/cinemas.yml`.
 
 ## Installation
 
