@@ -5,7 +5,7 @@
 #
 # Cinema.all is what turns those entries into objects, so these read the real
 # file through it — a key renamed in one place and not the other shows up here
-# rather than in a Monday digest.
+# rather than in a Wednesday digest.
 class CinemasConfigTest < ServiceTest
   CINEMAS = Cinema.all
 

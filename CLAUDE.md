@@ -1,6 +1,6 @@
 # Gijón VO Cinema Weekly Notifier
 
-A Ruby script that asks two cinema listings — SensaCine and Yelmo, both internal JSON APIs — for the week's non-dubbed screenings in Gijón, reconciles what they say into one programme, enriches it with TMDB ratings, and delivers a Telegram digest on Monday and Friday mornings.
+A Ruby script that asks two cinema listings — SensaCine and Yelmo, both internal JSON APIs — for the week's non-dubbed screenings in Gijón, reconciles what they say into one programme, enriches it with TMDB ratings, and delivers a Telegram digest on Wednesday and Friday mornings.
 
 ## Git workflow
 
@@ -88,7 +88,7 @@ test/
 .github/workflows/
   test.yml              # runs ruby test.rb on every pull request and on master
   rubycritic.yml        # code quality gate on lib/ (minimum score 92)
-  weekly.yml            # Monday and Friday 11:00 Gijón cron; dispatch takes dry_run
+  weekly.yml            # Wednesday and Friday, noon Gijón cron; dispatch takes dry_run
   diagnose.yml          # workflow_dispatch token/API health check
   capture-fixtures.yml  # workflow_dispatch: print live payloads for fixtures
   programme-watch.yml   # Tue/Wed/Sat dry run; temporary, settles the fill-in question
@@ -178,15 +178,17 @@ Consequences, all of which are easy to get wrong:
 - **Which day is "day zero" is `Clock.today`, not `Date.today`.** `Date.today`
   reads the timezone of the machine running, and a GitHub runner is on UTC — so
   a run just after midnight in Gijón asks about yesterday, never asks about the
-  seventh day, and heads the digest with a range off by one. The 11:00 cron
-  cannot trip this (09:00 and 10:00 UTC are the same calendar day as 11:00 in
-  Gijón), which is exactly why a manual run late in the evening is what found
-  it. `Clock` reads the zone from `config/cinemas.yml` and asks tzinfo.
-- The cron fires at 11:00 in Gijón, ahead of the day's first screening (the
-  earliest seen at Ocimax is 16:00), so day zero reaches subscribers whole.
-  GitHub's cron is UTC only and Gijón changes offset twice a year, so
-  `weekly.yml` fires at both 09:00 and 10:00 UTC and drops whichever one is not
-  11:00 locally.
+  seventh day, and heads the digest with a range off by one. The scheduled
+  cron cannot trip this (11:00 UTC lands around noon in Gijón, nowhere near
+  midnight), which is exactly why a manual run late in the evening is what
+  found it. `Clock` reads the zone from `config/cinemas.yml` and asks tzinfo.
+- The cron fires around noon in Gijón, well ahead of the day's first screening
+  (the earliest seen at Ocimax is 16:00), so day zero reaches subscribers
+  whole. It is a single fixed UTC hour (`0 11 * * 3,5`, Wednesday and Friday),
+  not a pair guarded against the daylight-saving switch: Gijón moves between
+  CET and CEST, so local time drifts by an hour across it (noon in winter,
+  13:00 in summer), and that drift is not worth a guard — GitHub's own
+  best-effort scheduling can already land a run hours later than requested.
 - The digest says so out loud rather than implying a complete day:
   `Digest::Renderer#closing_notes` ends every message with a line explaining
   that today lists only what is still to come, and names a venue with nothing
@@ -582,7 +584,8 @@ The 1 September reading looks like a quiet week at Ocimax: bookable screenings
 on four of seven days. The likelier reading is that the cinemas publish a base
 programme and put the rest on sale later, closer to the weekend — in which case
 `overlapping` measures how much was **on sale when we asked**, not how much is
-on, and the Monday digest systematically under-reports the coming weekend.
+on, and a digest run on the base programme (Monday, as `weekly.yml` used to run)
+systematically under-reports the coming weekend.
 
 Three readings taken over three days say exactly the same thing:
 
@@ -630,9 +633,30 @@ theatre `E0628`, which dates return screenings and which return
 `next.showtime.on` with what `nextDate`; the dates to watch first are **5–9
 September**. It carries no Telegram secrets and so cannot post.
 
+**The Wednesday reading confirmed it — for Ocimax.** The scheduled firing
+itself landed late (target 08:00 UTC, actual 12:35 UTC — the same best-effort
+GitHub scheduling `weekly.yml` also has to live with), but still well within
+the same day. For `E0628`, every date from 2 through 8 September came back
+with real screenings: the `next.showtime.on` boundary that sat at 4 September
+on every earlier reading is gone from the window entirely. `overlapping` at
+Ocimax jumped from 117 to 277 in the same run, which is what more of the week
+being on sale looks like from the agreement block. `E2907` did not move:
+still real data only through 3 September, still `nextDate: 2026-09-11`. So the
+fill is real, but not simultaneous across venues — confirmed where predicted,
+at Ocimax, with `E2907` and the Saturday reading still open on whether the
+fill happens later there or on a different cadence altogether.
+
+Acting on that: `weekly.yml` now runs Wednesday and Friday instead of Monday
+and Friday, so the digest goes out once the week has (at least mostly) filled
+in rather than before. That is a production decision made ahead of full
+confirmation — Ocimax alone was enough to act on, since a Monday run was
+already known to be wrong for it.
+
 That workflow is **temporary** — it exists to settle this question, and should
-be deleted once the answer is written down here. Reading it by eye is the whole
-method; nothing is persisted, for the same reasons as the agreement block.
+be deleted once the answer is written down here. It is not there yet: the
+Saturday reading is still outstanding, and `E2907`'s cadence is still an open
+question. Reading it by eye is the whole method; nothing is persisted, for the
+same reasons as the agreement block.
 
 If it is confirmed, two things follow. `Digest::Renderer#closing_notes` says
 *"Nothing left to catch this week at: …"*, which for a venue whose programme is

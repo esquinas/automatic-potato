@@ -11,8 +11,8 @@ module VoCinema
   # in Gijón sees yesterday's date: it asks the providers for a day whose
   # programme has already been shown, never asks about the last day of the
   # week, and heads the digest with a range that is off by one. The scheduled
-  # cron fires at 11:00 local and so never noticed; a manual run late in the
-  # evening does.
+  # cron fires around noon local and so never noticed; a manual run late in
+  # the evening does.
   #
   # The zone is configuration rather than a constant because it belongs with
   # the cinemas it describes — a service pointed at another city changes one
@@ -26,7 +26,7 @@ module VoCinema
     def self.zone(path = CONFIG) = TZInfo::Timezone.get(name(path))
 
     # A config without a timezone still runs, on the city the service was
-    # written for, rather than failing a Monday digest over a missing line.
+    # written for, rather than failing a Wednesday digest over a missing line.
     def self.name(path = CONFIG) = YAML.load_file(path)["timezone"] || FALLBACK
   end
 end
