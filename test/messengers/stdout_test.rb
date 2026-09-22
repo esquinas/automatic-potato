@@ -25,6 +25,12 @@ class StdoutTest < ServiceTest
     refute_match(/<[^>]+>/, printed_output)
   end
 
+  def test_it_prints_escaped_characters_as_themselves
+    Messengers::Stdout.new.send_message("<b>Fast &amp; Furious</b> <i>(A &lt;B&gt; &quot;C&quot;)</i>")
+
+    assert_includes printed_output, 'Fast & Furious (A <B> "C")'
+  end
+
   def test_it_does_not_shorten_the_digest
     # Only Telegram has a length limit; a terminal gets the whole week.
     long_week = (1..60).map { |n| "<b>Película número #{n}</b>" }.join("\n")

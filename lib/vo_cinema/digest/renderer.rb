@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "cgi"
 require "date"
 
 module VoCinema
@@ -9,6 +10,11 @@ module VoCinema
     # Pure: it asks nobody anything and changes nothing. Give it the same listings
     # twice and it produces the same text, which is what makes the digest cheap to
     # test and cheap to reason about.
+    #
+    # Every name it prints comes from a provider or TMDB and goes out as
+    # Telegram HTML, so each is escaped on the way in: a title with an "&" in
+    # it ("Fast & Furious") would otherwise make Telegram reject the whole
+    # message.
     class Renderer
       def initialize(today:, week_days:)
         @today     = today
@@ -29,9 +35,9 @@ module VoCinema
       end
 
       def cinema_heading(listing)
-        label = "#{listing.name} — #{@today} → #{week_end}"
+        label = "#{escape(listing.name)} — #{@today} → #{week_end}"
         url   = listing.url
-        url ? "<b><a href=\"#{url}\">#{label}</a></b>" : "<b>#{label}</b>"
+        url ? "<b><a href=\"#{escape(url)}\">#{label}</a></b>" : "<b>#{label}</b>"
       end
 
       def week_end = (@today + @week_days - 1).to_s
@@ -41,10 +47,18 @@ module VoCinema
       end
 
       def title_line(film, rating)
-        parts = ["<b>#{film.localized_title}</b>"]
-        parts << "<i>(#{film.title})</i>" if renamed_for_spain?(film)
+        parts = ["<b>#{linked_title(film)}</b>"]
+        parts << "<i>(#{escape(film.title)})</i>" if renamed_for_spain?(film)
         parts << rating
         parts.join(" ").strip
+      end
+
+      # A film TMDB could not place keeps its title as plain text rather than
+      # a link to nowhere.
+      def linked_title(film)
+        url   = film.tmdb_url
+        title = escape(film.localized_title)
+        url ? "<a href=\"#{escape(url)}\">#{title}</a>" : title
       end
 
       # Printing both titles is only worth the width when they actually differ;
@@ -64,10 +78,12 @@ module VoCinema
       # CLAUDE.md.
       def closing_notes(nothing_left_at)
         notes = []
-        notes += ["Nothing left to catch this week at: #{nothing_left_at.join(", ")}", ""] unless nothing_left_at.empty?
+        notes += ["Nothing left to catch this week at: #{escape(nothing_left_at.join(", "))}", ""] unless nothing_left_at.empty?
         notes << "Today lists only what is still to come; earlier screenings have already been shown."
         notes
       end
+
+      def escape(text) = CGI.escapeHTML(text)
     end
   end
 end

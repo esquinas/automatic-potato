@@ -3,9 +3,9 @@
 require "json"
 require "uri"
 
-# Movies::Tmdb answers three questions about a film the cinemas only named in
-# Spanish: what is it called originally, how is it rated, and was it made in
-# Spanish in the first place.
+# Movies::Tmdb answers four questions about a film the cinemas only named in
+# Spanish: what is it called originally, how is it rated, was it made in
+# Spanish in the first place, and where its page on TMDB is.
 #
 # It is deliberately shy about ratings. A wrong star next to a film is worse
 # than no star, so anything that looks like a doubtful match comes back as
@@ -120,6 +120,24 @@ class TmdbTest < ServiceTest
     end
 
     assert_nil original_title
+  end
+
+  def test_a_film_it_finds_links_to_its_page_on_the_website
+    answering_with("tmdb/search_la_sustancia.json")
+
+    url = asking { @client.profile_url_for(Film.new(localized_title: "La sustancia", year: 2024)) }
+
+    assert_equal "https://www.themoviedb.org/movie/933260", url
+  end
+
+  def test_a_film_tmdb_has_never_heard_of_has_no_page_to_link_to
+    answering_with("tmdb/search_no_results.json")
+
+    url = asking do
+      @client.profile_url_for(Film.new(localized_title: "Ciclo Buñuel: presentación", year: nil))
+    end
+
+    assert_nil url
   end
 
   def test_a_clear_match_is_rated
