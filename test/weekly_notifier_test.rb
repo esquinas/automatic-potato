@@ -151,6 +151,39 @@ class WeeklyNotifierTest < ServiceTest
     assert_equal ["https://www.laboralcinemateca.es/en/venta-de-entradas"], outbox.digest.links
   end
 
+  def test_a_title_with_an_ampersand_reaches_telegram_escaped
+    # Telegram parses the digest as HTML and rejects the whole message over a
+    # bare "&", so one film's title must not be able to cost the week.
+    furious  = film("Fast & Furious <25 aniversario>", year: 2001)
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(furious, on: "2026-09-04", at: "19:30")])
+    tmdb     = MovieDatabase.new(original_titles: { "Fast & Furious <25 aniversario>" => "The Fast and the Furious & Co" },
+                                 profile_urls:    { "Fast & Furious <25 aniversario>" => "https://www.themoviedb.org/movie/9799" })
+    outbox   = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+
+    assert_includes outbox.digest.raw, "Fast &amp; Furious &lt;25 aniversario&gt;"
+    assert_includes outbox.digest.raw, "The Fast and the Furious &amp; Co"
+    refute_match(/&(?!amp;|lt;|gt;|quot;|#39;)/, outbox.digest.raw)
+    assert outbox.digest.mentions?("Fast & Furious <25 aniversario>")
+    assert_includes outbox.digest.links, "https://www.themoviedb.org/movie/9799"
+  end
+
+  def test_a_cinema_name_with_an_ampersand_reaches_telegram_escaped
+    arts      = cinema("Cines Arte & Ensayo", sensacine_id: "X1", url: "https://example.org/?a=1&b=2")
+    substance = film("La sustancia", year: 2024)
+    listings  = Listings.new("Cines Arte & Ensayo" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    outbox    = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
+                       messenger: outbox, cinemas: [arts]).run(today: WEDNESDAY)
+
+    assert_includes outbox.digest.raw, "Cines Arte &amp; Ensayo"
+    assert_includes outbox.digest.raw, 'href="https://example.org/?a=1&amp;b=2"'
+    assert outbox.digest.mentions?("Cines Arte & Ensayo")
+  end
+
   def test_a_rated_film_is_shown_with_its_score
     potter   = film("Harry Potter y la Piedra Filosofal", year: 2001)
     listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(potter, on: "2026-09-04", at: "17:00")])
