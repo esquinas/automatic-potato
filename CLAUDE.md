@@ -71,6 +71,7 @@ lib/
       timetable.rb      # pure: one film's week, grouped by day and aligned into a column
     messengers/
       telegram.rb       # posts the digest; owns Telegram's length limit
+      telegram/excerpt.rb # cuts an oversized digest between blocks, so it still parses
       stdout.rb         # prints the digest; strips the markup a terminal cannot use
 bin/
   run.rb                # thin entry point
@@ -280,7 +281,10 @@ times is squared up.
 
 **Each messenger owns its medium's constraints** — `Messengers::Telegram` holds
 the 4096-character limit (enforced at 3800 with a "truncated" marker) because
-that ceiling is a fact about Telegram, not about the digest; `Messengers::Stdout`
+that ceiling is a fact about Telegram, not about the digest. `Telegram::Excerpt`
+cuts at the last blank line before the limit: the digest's blocks (a cinema
+heading, or a film with its `<pre>` timetable) are set off by blank lines and
+no tag or entity spans two, so the cut never leaves HTML Telegram would reject; `Messengers::Stdout`
 strips the markup, because a terminal cannot use `<b>` and `<pre>`.
 `Digest::Renderer` writes one digest in Telegram's flavour and hands it over
 whole, knowing nothing about where it goes. That keeps a local run readable
