@@ -53,7 +53,7 @@ module VoCinema
     end
 
     # The providers only know a film by its Spanish release title. Filling in
-    # the original title and the rating happens here, before anything is
+    # the original title, the TMDB link and the rating happens here, before anything is
     # rendered, because this object owns the enrichment lifecycle — the movie
     # database stays a pure query and the renderer stays a pure function.
     #
@@ -61,13 +61,18 @@ module VoCinema
     # known, so the titles are filled in first.
     def listing_for(cinema, sessions)
       films = sessions.map(&:film).uniq
-      films.each { |film| film.title = @movies_db.fetch_original_title(film) }
+      films.each { |film| enrich(film) }
 
       CinemaListing.new(
         cinema:   cinema,
         sessions: sessions,
         ratings:  films.to_h { |film| [film, @movies_db.rating_for(film)] }
       )
+    end
+
+    def enrich(film)
+      film.title    = @movies_db.fetch_original_title(film)
+      film.tmdb_url = @movies_db.profile_url_for(film)
     end
 
     # Every provider is asked about every cinema, and answers for itself. Its

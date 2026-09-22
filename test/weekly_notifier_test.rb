@@ -126,6 +126,31 @@ class WeeklyNotifierTest < ServiceTest
     assert_equal 1, outbox.digest.text.scan("El ser querido").length
   end
 
+  def test_a_film_tmdb_placed_links_to_its_page_there
+    substance = film("La sustancia", year: 2024)
+    listings  = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(substance, on: "2026-09-04", at: "19:30")])
+    tmdb      = MovieDatabase.new(profile_urls: { "La sustancia" => "https://www.themoviedb.org/movie/933260" })
+    outbox    = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+
+    assert_includes outbox.digest.links, "https://www.themoviedb.org/movie/933260"
+    assert_equal "La sustancia", outbox.digest.block_about("La sustancia").lines.first.chomp
+  end
+
+  def test_a_film_tmdb_could_not_place_is_named_without_a_link
+    obscure  = film("Ciclo Buñuel: presentación")
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(obscure, on: "2026-09-04", at: "20:00")])
+    outbox   = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+
+    assert outbox.digest.mentions?("Ciclo Buñuel: presentación")
+    assert_equal ["https://www.laboralcinemateca.es/en/venta-de-entradas"], outbox.digest.links
+  end
+
   def test_a_rated_film_is_shown_with_its_score
     potter   = film("Harry Potter y la Piedra Filosofal", year: 2001)
     listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(potter, on: "2026-09-04", at: "17:00")])

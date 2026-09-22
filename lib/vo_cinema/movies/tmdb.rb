@@ -6,11 +6,13 @@ require "uri"
 module VoCinema
   module Movies
     # What TMDB knows about a film the cinemas listed in Spanish: its original
-    # title, its rating, and whether it is a Spanish production.
+    # title, its rating, whether it is a Spanish production, and where its page
+    # on TMDB is.
     #
-    # Three pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
+    # Four pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
     class Tmdb
       DOMAIN          = "https://api.themoviedb.org"
+      SITE            = "https://www.themoviedb.org"
       AMBIGUITY_RATIO = 2.0
 
       def initialize(api_key: ENV.fetch("TMDB_API_KEY"), http: Http::Client.new)
@@ -25,6 +27,14 @@ module VoCinema
 
       def spanish_original?(film)
         top_match_for(film.localized_title, film.year)&.dig("original_language") == "es"
+      end
+
+      # The same top match the original title comes from, so the link always
+      # leads to the film whose title the digest prints beside it.
+      def profile_url_for(film)
+        id = top_match_for(film.localized_title, film.year)&.dig("id")
+
+        id && "#{SITE}/movie/#{id}"
       end
 
       def rating_for(film)

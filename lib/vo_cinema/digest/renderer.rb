@@ -41,10 +41,17 @@ module VoCinema
       end
 
       def title_line(film, rating)
-        parts = ["<b>#{film.localized_title}</b>"]
+        parts = ["<b>#{linked_title(film)}</b>"]
         parts << "<i>(#{film.title})</i>" if renamed_for_spain?(film)
         parts << rating
         parts.join(" ").strip
+      end
+
+      # A film TMDB could not place keeps its title as plain text rather than
+      # a link to nowhere.
+      def linked_title(film)
+        url = film.tmdb_url
+        url ? "<a href=\"#{url}\">#{film.localized_title}</a>" : film.localized_title
       end
 
       # Printing both titles is only worth the width when they actually differ;

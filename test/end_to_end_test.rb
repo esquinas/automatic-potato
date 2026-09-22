@@ -154,6 +154,10 @@ class EndToEndTest < ServiceTest
     assert_includes laboral.block_about("La constelación del perro"), "7.1"
   end
 
+  def test_a_film_tmdb_found_links_to_its_page_there
+    assert_includes digest.links, "https://www.themoviedb.org/movie/1384216"
+  end
+
   def test_a_venue_with_nothing_on_is_named_at_the_end
     assert digest.mentions?("Teatro Jovellanos")
     assert digest.mentions?("Nothing left to catch")
