@@ -31,11 +31,7 @@ module VoCinema
 
       def payload_for(text) = JSON.generate(chat_id: @chat_id, text: text, parse_mode: "HTML")
 
-      def within_limit(text)
-        return text if text.length <= MAX_MSG_CHARS
-
-        "#{text[0, MAX_MSG_CHARS]}\n... (truncated)"
-      end
+      def within_limit(text) = Excerpt.new(text, limit: MAX_MSG_CHARS).to_s
     end
   end
 end

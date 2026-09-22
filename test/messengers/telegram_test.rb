@@ -77,6 +77,42 @@ class TelegramTest < ServiceTest
     assert_includes delivered, "Película número 1 del ciclo de verano"
   end
 
+  def test_a_digest_is_cut_between_films_so_telegram_can_still_parse_it
+    # Telegram parses the digest as HTML and rejects the whole message over an
+    # unclosed <pre> or a half-sent &amp; — the fate the cut exists to avoid.
+    # So a film is sent whole or not at all.
+    film_entry = lambda do |n|
+      "<b><a href=\"https://www.themoviedb.org/movie/#{n}\">Fast &amp; Furious #{n}</a></b> <i>(Rápidos &amp; furiosos)</i>\n" \
+        "<pre>• Wed → 16:00, 18:30, 21:00\n• Thu → 16:00, 18:30, 21:00\n• Fri → 16:00, 18:30, 21:00</pre>"
+    end
+    week = ["<b>Yelmo Cines Ocimax Gijón — 2026-09-02 → 2026-09-08</b>", *(1..40).map(&film_entry)].join("\n\n")
+
+    deliver(week)
+    delivered = JSON.parse(@http.requests.first.body)["text"]
+    shown     = delivered.delete_suffix("\n\n... (truncated)")
+
+    assert_operator week.length, :>, 3800, "the digest under test has to be an oversized one"
+    assert_operator delivered.length, :<, 4096
+    assert delivered.end_with?("... (truncated)")
+    assert week.start_with?("#{shown}\n\n"), "the digest was cut through a block"
+    assert_equal shown.scan("<pre>").length, shown.scan("</pre>").length
+    refute_match(/&(?!amp;)/, shown)
+  end
+
+  def test_a_single_block_too_long_to_send_whole_goes_out_as_plain_text
+    # No real week produces one, but if it happened the message must still be
+    # one Telegram accepts: no half-open tag, no half-sent entity.
+    one_enormous_block = "<b>Ciclo</b>\n<pre>#{"Fast &amp; Furious · " * 400}</pre>"
+
+    deliver(one_enormous_block)
+    delivered = JSON.parse(@http.requests.first.body)["text"]
+
+    assert_operator delivered.length, :<, 4096
+    assert delivered.end_with?("... (truncated)")
+    refute_match(/[<>]/, delivered)
+    refute_match(/&(?!amp;)/, delivered)
+  end
+
   def test_a_digest_telegram_will_accept_is_sent_untouched
     whole_week = "<b>Yelmo Cines Ocimax Gijón</b>\n<pre>• Sat → 19:30</pre>"
 
