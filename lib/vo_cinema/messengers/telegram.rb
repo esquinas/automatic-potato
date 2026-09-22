@@ -16,6 +16,14 @@ module VoCinema
       # not cut it short.
       MAX_MSG_CHARS = 3800
 
+      # The digest is written as blocks set off by a blank line — a cinema
+      # heading, or one film with its timetable — and every tag and entity
+      # opens and closes inside its block. Cutting between blocks is what keeps
+      # a shortened digest valid HTML: a cut inside <pre> or through an &amp;
+      # makes Telegram reject the lot, which is the very thing the limit is for.
+      BLOCK_BREAK = "\n\n"
+      TRUNCATED   = "... (truncated)"
+
       def initialize(token: ENV.fetch("TELEGRAM_BOT_TOKEN"), chat_id: ENV.fetch("TELEGRAM_CHAT_ID"),
                      http: Http::Client.new(headers: HEADERS))
         @token   = token
@@ -34,7 +42,19 @@ module VoCinema
       def within_limit(text)
         return text if text.length <= MAX_MSG_CHARS
 
-        "#{text[0, MAX_MSG_CHARS]}\n... (truncated)"
+        "#{whole_blocks_of(text) || plain_head_of(text)}#{BLOCK_BREAK}#{TRUNCATED}"
+      end
+
+      def whole_blocks_of(text)
+        cut = text.rindex(BLOCK_BREAK, MAX_MSG_CHARS)
+        cut&.positive? ? text[0, cut] : nil
+      end
+
+      # Only reached if a single block outgrows the limit, which no real week
+      # comes near. Without its markup the head cannot hold a half-open tag;
+      # an entity the cut went through is dropped rather than sent broken.
+      def plain_head_of(text)
+        text[0, MAX_MSG_CHARS].gsub(/<[^>]*>?/, "").sub(/&[^;\s]*\z/, "")
       end
     end
   end
