@@ -165,6 +165,17 @@ class TmdbTest < ServiceTest
     assert_equal "US", country
   end
 
+  def test_a_co_production_is_flagged_by_the_first_country_tmdb_names
+    # The Substance names two origin countries and three production ones; the
+    # digest shows one flag, the first of origin_country.
+    @http.answers "/3/movie/933260?", body: Fixtures.read("tmdb/movie_la_sustancia.json")
+    answering_with("tmdb/search_la_sustancia.json")
+
+    country = asking { @client.origin_country_for(Film.new(localized_title: "La sustancia", year: 2024)) }
+
+    assert_equal "GB", country
+  end
+
   def test_a_film_tmdb_has_never_heard_of_has_no_country_and_no_page_is_asked_for
     answering_with("tmdb/search_no_results.json")
 
