@@ -14,6 +14,7 @@
 
 require "bundler/setup"
 require "json"
+require "uri"
 require "date"
 require_relative "../lib/vo_cinema"
 

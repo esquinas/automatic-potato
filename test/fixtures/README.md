@@ -60,12 +60,11 @@ Captured 2026-08-28 from `GET /3/search/movie`, one file per query.
 `original_language` is `es`; the others are English-language films with a
 Spanish release title.
 
-`movie_el_ser_querido.json` and `movie_la_constelacion_del_perro.json` are the
-film pages (`GET /3/movie/{id}`) behind two of those searches, which is where
-the country the digest flags comes from: `origin_country`, and
-`production_countries` as the fallback. **These two were written by hand, not
-captured** — they were added in a session with no TMDB key. The shape follows
-TMDB's documented response, pruned to the keys the notifier reads, and the
-countries are the films' real ones. Run the **Capture API fixtures** workflow
-with `provider=tmdb` to replace them with real captures: it now fetches each
-top match's page alongside the search and prints it as `tmdb/movie_….json`.
+`movie_*.json` are the film pages (`GET /3/movie/{id}`) behind each of those
+searches, which is where the country the digest flags comes from:
+`origin_country`, and `production_countries` as the fallback. Captured
+2026-09-23 (Capture API fixtures run 35914104973, `provider=tmdb`), pruned by
+the capture script to the keys the notifier reads. `movie_la_sustancia.json`
+is the co-production case: two origin countries, three production ones. The
+page titles are TMDB's English ones ("The Beloved", "Tad and The Magic Lamp"),
+because the page is fetched without a `language`; nothing reads them.

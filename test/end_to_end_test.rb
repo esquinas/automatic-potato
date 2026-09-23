@@ -50,11 +50,12 @@ class EndToEndTest < ServiceTest
     tmdb_knows "The Dog Stars",                         "tmdb/search_la_constelacion_del_perro.json"
     tmdb_knows "Harry Potter and the Philosopher's Stone", "tmdb/search_harry_potter.json"
     # TMDB, each matched film's own page, which is where its country comes from.
-    # A film with no fixture of its own gets a page that names no country, and
-    # so no flag. These come before the catch-all below, which would swallow them.
+    # These come before the catch-all below, which would swallow them.
     @http.answers "/3/movie/1384216?", body: Fixtures.read("tmdb/movie_la_constelacion_del_perro.json")
     @http.answers "/3/movie/1074074?", body: Fixtures.read("tmdb/movie_el_ser_querido.json")
-    @http.answers "/3/movie/",         body: "{}"
+    @http.answers "/3/movie/1187326?", body: Fixtures.read("tmdb/movie_tadeo_jones.json")
+    @http.answers "/3/movie/671?",     body: Fixtures.read("tmdb/movie_harry_potter.json")
+    @http.answers "/3/movie/1433367?", body: Fixtures.read("tmdb/movie_una_noche_al_ano.json")
     # Yelmo bills the anniversary re-release under a title TMDB has never heard of.
     @http.answers "api.themoviedb.org", body: Fixtures.read("tmdb/search_no_results.json")
 
@@ -165,9 +166,15 @@ class EndToEndTest < ServiceTest
   end
 
   def test_a_film_s_line_ends_with_the_flag_of_its_country_after_its_rating
-    title_line = digest.raw.lines.find { |line| line.include?("movie/1384216") }.chomp
+    dog_stars = digest.raw.lines.find { |line| line.include?("movie/1384216") }.chomp
+    tadeo     = digest.raw.lines.find { |line| line.include?("movie/1187326") }.chomp
+    potter    = digest.raw.lines.find { |line| line.include?("movie/671\"") }.chomp
 
-    assert title_line.end_with?("</i> ★ 7.1 🇺🇸"), "no flag after the rating: #{title_line.inspect}"
+    assert dog_stars.end_with?("</i> ★ 7.1 🇺🇸"), "no flag after the rating: #{dog_stars.inspect}"
+    assert tadeo.end_with?("</b> ★ 2.0 🇪🇸"), "no flag after the rating: #{tadeo.inspect}"
+    # An English-language film made in Britain: the flag follows the country,
+    # not the language.
+    assert potter.end_with?("</i> ★ 7.9 🇬🇧"), "no flag after the rating: #{potter.inspect}"
   end
 
   def test_a_venue_with_nothing_on_is_named_at_the_end
