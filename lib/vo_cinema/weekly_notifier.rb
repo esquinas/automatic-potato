@@ -53,7 +53,7 @@ module VoCinema
     end
 
     # The providers only know a film by its Spanish release title. Filling in
-    # the original title, the TMDB link and the rating happens here, before anything is
+    # the original title, the TMDB link, the country and the rating happens here, before anything is
     # rendered, because this object owns the enrichment lifecycle — the movie
     # database stays a pure query and the renderer stays a pure function.
     #
@@ -73,6 +73,7 @@ module VoCinema
     def enrich(film)
       film.title    = @movies_db.fetch_original_title(film)
       film.tmdb_url = @movies_db.profile_url_for(film)
+      film.country  = @movies_db.origin_country_for(film)
     end
 
     # Every provider is asked about every cinema, and answers for itself. Its

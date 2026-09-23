@@ -40,11 +40,12 @@ end
 # Spanish title the cinemas use. Anything it has not been told about behaves
 # like a film TMDB could not match.
 class MovieDatabase
-  def initialize(original_titles: {}, ratings: {}, spanish_productions: [], profile_urls: {})
+  def initialize(original_titles: {}, ratings: {}, spanish_productions: [], profile_urls: {}, countries: {})
     @original_titles     = original_titles
     @ratings             = ratings
     @spanish_productions = spanish_productions
     @profile_urls        = profile_urls
+    @countries           = countries
     @questions           = []
   end
 
@@ -58,6 +59,11 @@ class MovieDatabase
   def profile_url_for(film)
     @questions << [:profile_url_for, film.localized_title]
     @profile_urls[film.localized_title]
+  end
+
+  def origin_country_for(film)
+    @questions << [:origin_country_for, film.localized_title]
+    @countries[film.localized_title]
   end
 
   def rating_for(film)

@@ -49,8 +49,11 @@ module VoCinema
       def title_line(film, rating)
         parts = ["<b>#{linked_title(film)}</b>"]
         parts << "<i>(#{escape(film.title)})</i>" if renamed_for_spain?(film)
-        parts << rating
-        parts.join(" ").strip
+        parts << rating << Flag.for(film.country)
+        # A missing rating or flag is an empty string. Dropping those before
+        # joining keeps the spacing single wherever the gap falls, which strip
+        # alone could not do once the flag came after the rating.
+        parts.map(&:to_s).reject(&:empty?).join(" ")
       end
 
       # A film TMDB could not place keeps its title as plain text rather than

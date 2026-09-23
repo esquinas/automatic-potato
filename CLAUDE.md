@@ -44,7 +44,7 @@ lib/
   vo_cinema/
     cinema.rb           # Data.define: one venue as config/cinemas.yml describes it
     clock.rb            # what day it is where the cinemas are, not where the process runs
-    film.rb             # mutable PORO: localized_title + director read from the feed; title + tmdb_url filled after TMDB
+    film.rb             # mutable PORO: localized_title + director read from the feed; title, tmdb_url, country filled after TMDB
     rating.rb           # Data.define with .null sentinel; to_s/to_str safe for interpolation
     screening_session.rb# Data.define: film, date, starts_at, original_version?
     cinema_listing.rb   # Data.define: one cinema's week, enriched and ready to print
@@ -65,10 +65,11 @@ lib/
       yelmo/listing.rb  # reads one cinema's formats and times into ScreeningSessions by day
       yelmo/movie.rb    # reads one film's title and director into a Film
     movies/
-      tmdb.rb           # original title, rating, TMDB page, and whether a film is a Spanish production
+      tmdb.rb           # original title, rating, TMDB page, country, and whether a film is a Spanish production
     digest/
       renderer.rb       # pure: turns listings into the Telegram message
       timetable.rb      # pure: one film's week, grouped by day and aligned into a column
+      flag.rb           # pure: an ISO country code as its emoji flag
     messengers/
       telegram.rb       # posts the digest; owns Telegram's length limit
       telegram/excerpt.rb # cuts an oversized digest between blocks, so it still parses
@@ -233,7 +234,9 @@ The old `api.sensacine.com/rest/v3/showtimelist` endpoint is dead (403 since ~20
 3. If top two results have rating ratio < 2×, return `Rating.null` (ambiguous match — no rating shown).
 4. Every search is cached for the life of the client, keyed by `[title, year]`.
 
-`Movies::Tmdb` exposes four pure queries: `fetch_original_title(film)`, `rating_for(film)`, `spanish_original?(film)` (`original_language == "es"` on the top search result), and `profile_url_for(film)` (`https://www.themoviedb.org/movie/{id}` of that same top result, or `nil` when TMDB found nothing). Mutation (`film.title =`, `film.tmdb_url =`) stays in `WeeklyNotifier`.
+`Movies::Tmdb` exposes five pure queries: `fetch_original_title(film)`, `rating_for(film)`, `spanish_original?(film)` (`original_language == "es"` on the top search result), `profile_url_for(film)` (`https://www.themoviedb.org/movie/{id}` of that same top result, or `nil` when TMDB found nothing), and `origin_country_for(film)` (the first of `origin_country`, else of `production_countries`, on that result's own page). Mutation (`film.title =`, `film.tmdb_url =`, `film.country =`) stays in `WeeklyNotifier`.
+
+The country is the one answer the search results do not carry, so it costs a second request: `GET /3/movie/{id}`, once per matched film per run, cached by id. `Digest::Flag` turns the ISO code into an emoji flag by arithmetic on the letters (regional indicator symbols), so there is no country table to keep up to date. The digest prints it at the end of the title line, after the rating and outside the link; a film with no country, or none TMDB could place, gets no flag and no gap.
 
 The digest prints a film's title as a link to that page, and as plain text when there is none. The link comes from the same top match as the original title printed beside it, not from the confidence check `rating_for` applies — so a film can be linked and still carry no rating.
 
@@ -375,7 +378,7 @@ grouping them, which is load-bearing rather than tidiness: see *Being the same
 film is not transitive* below. `Film#same_film_as?` is the one piece that lives
 elsewhere: whether two records are the same film is the film's own business.
 
-**`Film` is a mutable PORO** — `title` and `tmdb_url` start `nil` and are filled after TMDB lookup. `Data.define` was rejected here because immutability would require propagating new instances across all `ScreeningSession` references that already hold the original `Film`.
+**`Film` is a mutable PORO** — `title`, `tmdb_url` and `country` start `nil` and are filled after TMDB lookup. `Data.define` was rejected here because immutability would require propagating new instances across all `ScreeningSession` references that already hold the original `Film`.
 
 **`ScreeningSession` is `Data.define`** — fully resolved at construction time, never mutated.
 
@@ -385,9 +388,9 @@ elsewhere: whether two records are the same film is the film's own business.
 
 **Spanish-original films fall back to a TMDB check** — a Spanish production is never dubbed or subtitled, so no provider ever marks its plain screening as VO; its only version simply *is* the original one. When `check_vo` would otherwise drop a session, `WeeklyNotifier#surviving` asks `Movies::Tmdb#spanish_original?(film)` before excluding it, and keeps the session if TMDB's `original_language` is `"es"`. The repeated asking costs nothing: `Movies::Tmdb` caches its own searches, so the notifier keeps no lookup table of its own.
 
-**`Rating` is a NullObject** — `Rating.null` returns a frozen instance with `score: nil`. Both present and null ratings implement `to_s` / `to_str`, so callers push them into a parts array and call `.join(" ").strip` — no conditionals, no `nil` checks. `Rating.null.to_s` returns `""`, which `strip` absorbs silently. `to_str` enables implicit coercion in `String#+` and `Array#join`.
+**`Rating` is a NullObject** — `Rating.null` returns a frozen instance with `score: nil`. Both present and null ratings implement `to_s` / `to_str`, so callers push them into a parts array, drop the empty strings and join — no conditionals, no `nil` checks. `Rating.null.to_s` returns `""`, which the title line leaves out, as it does a missing flag. `to_str` enables implicit coercion in `String#+` and `Array#join`.
 
-**Command-query separation on `Movies::Tmdb`** — `fetch_original_title`, `rating_for`, `spanish_original?` and `profile_url_for` are pure queries. Mutation (`film.title =`, `film.tmdb_url =`) stays in `WeeklyNotifier`, which owns the enrichment lifecycle.
+**Command-query separation on `Movies::Tmdb`** — `fetch_original_title`, `rating_for`, `spanish_original?`, `profile_url_for` and `origin_country_for` are pure queries. Mutation (`film.title =`, `film.tmdb_url =`, `film.country =`) stays in `WeeklyNotifier`, which owns the enrichment lifecycle.
 
 **Unified constructor signatures** — every provider, movie database and messenger shares the same call site: plain `.new`, with collaborators and secrets as defaulted keyword arguments. `Messengers::Stdout`, which needs no config at all, declares `def initialize(**) = nil` to accept and discard any kwargs, so a caller passing options uniformly does not have to special-case it.
 
