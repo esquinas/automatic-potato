@@ -3,9 +3,10 @@
 require "json"
 require "uri"
 
-# Movies::Tmdb answers four questions about a film the cinemas only named in
+# Movies::Tmdb answers five questions about a film the cinemas only named in
 # Spanish: what is it called originally, how is it rated, was it made in
-# Spanish in the first place, and where its page on TMDB is.
+# Spanish in the first place, where its page on TMDB is, and which country it
+# comes from.
 #
 # It is deliberately shy about ratings. A wrong star next to a film is worse
 # than no star, so anything that looks like a doubtful match comes back as
@@ -138,6 +139,60 @@ class TmdbTest < ServiceTest
     end
 
     assert_nil url
+  end
+
+  def test_a_film_s_country_is_read_from_its_own_page
+    # The search results name no country, so the film's page is asked for too
+    # — the page of the same top match the digest links to.
+    @http.answers "/3/movie/1074074?", body: Fixtures.read("tmdb/movie_el_ser_querido.json")
+    answering_with("tmdb/search_el_ser_querido.json")
+
+    country = asking { @client.origin_country_for(Film.new(localized_title: "El ser querido", year: 2026)) }
+
+    assert_equal "ES", country
+    assert_equal 1, @http.requests_to("/3/movie/1074074?").length
+  end
+
+  def test_a_page_with_no_origin_country_falls_back_to_where_it_was_produced
+    page = Fixtures.parse("tmdb/movie_la_constelacion_del_perro.json").merge("origin_country" => [])
+    @http.answers "/3/movie/1384216?", body: JSON.generate(page)
+    answering_with("tmdb/search_la_constelacion_del_perro.json")
+
+    country = asking do
+      @client.origin_country_for(Film.new(localized_title: "La constelación del perro", year: 2026))
+    end
+
+    assert_equal "US", country
+  end
+
+  def test_a_film_tmdb_has_never_heard_of_has_no_country_and_no_page_is_asked_for
+    answering_with("tmdb/search_no_results.json")
+
+    country = asking do
+      @client.origin_country_for(Film.new(localized_title: "Ciclo Buñuel: presentación", year: nil))
+    end
+
+    assert_nil country
+    assert_empty @http.requests_to("/3/movie/")
+  end
+
+  def test_a_film_s_page_is_fetched_once_however_often_it_is_asked_about
+    @http.answers "/3/movie/1074074?", body: Fixtures.read("tmdb/movie_el_ser_querido.json")
+    answering_with("tmdb/search_el_ser_querido.json")
+    querido = Film.new(localized_title: "El ser querido", year: 2026)
+
+    asking { 3.times { @client.origin_country_for(querido) } }
+
+    assert_equal 1, @http.requests_to("/3/movie/").length
+  end
+
+  def test_a_page_tmdb_will_not_serve_costs_the_flag_and_nothing_more
+    @http.answers "/3/movie/1074074?", status: "404"
+    answering_with("tmdb/search_el_ser_querido.json")
+
+    country = asking { @client.origin_country_for(Film.new(localized_title: "El ser querido", year: 2026)) }
+
+    assert_nil country
   end
 
   def test_a_clear_match_is_rated

@@ -224,6 +224,19 @@ else
            "lang=#{r["original_language"].inspect} score=#{r["vote_average"]} votes=#{r["vote_count"]}"
     end
     dump("tmdb/#{fixture}", prune(parsed.merge("results" => results)))
+
+    # The top match's own page, which is where the country the digest flags
+    # comes from. Only the keys the notifier reads are kept.
+    top = results.first or next
+    page = tmdb_http.get("#{VoCinema::Movies::Tmdb::DOMAIN}/3/movie/#{top["id"]}?#{URI.encode_www_form(api_key: tmdb_key)}")
+    puts "  page #{top["id"]} → HTTP #{page.code}"
+    next unless page.code == "200"
+
+    movie = parse_json(page) or next
+    puts "  origin_country=#{movie["origin_country"].inspect} " \
+         "production_countries=#{Array(movie["production_countries"]).map { |c| c["iso_3166_1"] }.inspect}"
+    dump("tmdb/#{fixture.sub("search_", "movie_")}",
+         movie.slice("id", "title", "original_language", "origin_country", "production_countries"))
   end
 end
 end

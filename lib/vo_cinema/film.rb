@@ -3,17 +3,17 @@
 module VoCinema
   # A film as the digest knows it: the Spanish release title the cinemas use, the
   # year it was made, its director, and — once TMDB has been asked — its original
-  # title and the address of its TMDB page.
+  # title, the address of its TMDB page and the country it comes from.
   #
   # Mutable on purpose. +title+ starts nil and is filled in after the lookup;
   # making it immutable would mean rebuilding every ScreeningSession that already
   # holds the film.
   class Film
-    # Only these are ever written: +title+ and +tmdb_url+ when TMDB answers, and
+    # Only these are ever written: +title+, +tmdb_url+ and +country+ when TMDB answers, and
     # +year+ when one provider dates a film the other left undated. What the
     # cinema called the film and who directed it are settled when the record is
     # read.
-    attr_accessor :title, :tmdb_url, :year
+    attr_accessor :title, :tmdb_url, :country, :year
     attr_reader :localized_title, :director
 
     def initialize(localized_title:, year:, title: nil, director: nil)

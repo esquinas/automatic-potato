@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "cgi"
+
 # Reads a delivered Telegram digest the way a subscriber would.
 #
 # Tests ask this what the message *says* — which film, at which times, under
@@ -15,11 +17,7 @@ class RenderedDigest
 
   # The message as it reads in Telegram, with the markup taken off.
   def text
-    @text ||= raw.gsub(/<[^>]+>/, "")
-                 .gsub("&amp;", "&")
-                 .gsub("&lt;", "<")
-                 .gsub("&gt;", ">")
-                 .gsub("&quot;", '"')
+    @text ||= CGI.unescapeHTML(raw.gsub(/<[^>]+>/, ""))
   end
 
   def mentions?(phrase) = text.include?(phrase)

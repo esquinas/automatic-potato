@@ -184,6 +184,46 @@ class WeeklyNotifierTest < ServiceTest
     assert outbox.digest.mentions?("Cines Arte & Ensayo")
   end
 
+  def test_a_film_s_line_ends_with_the_flag_of_its_country_after_its_rating
+    querido  = film("El ser querido", year: 2026)
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(querido, on: "2026-09-04", at: "19:00")])
+    tmdb     = MovieDatabase.new(countries:    { "El ser querido" => "ES" },
+                                 ratings:      { "El ser querido" => Rating.new(score: 6.8) },
+                                 profile_urls: { "El ser querido" => "https://www.themoviedb.org/movie/1074074" })
+    outbox   = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+    title_line = outbox.digest.raw.lines.find { |line| line.include?("El ser querido") }.chomp
+
+    assert_equal "<b><a href=\"https://www.themoviedb.org/movie/1074074\">El ser querido</a></b> ★ 6.8 🇪🇸", title_line
+  end
+
+  def test_a_flag_on_an_unrated_film_follows_the_title_with_a_single_space
+    querido  = film("El ser querido", year: 2026)
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(querido, on: "2026-09-04", at: "19:00")])
+    tmdb     = MovieDatabase.new(countries: { "El ser querido" => "ES" })
+    outbox   = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: tmdb,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+    title_line = outbox.digest.raw.lines.find { |line| line.include?("El ser querido") }.chomp
+
+    assert_equal "<b>El ser querido</b> 🇪🇸", title_line
+  end
+
+  def test_a_film_with_no_known_country_has_no_flag_and_no_gap
+    obscure  = film("Ciclo Buñuel: presentación")
+    listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(obscure, on: "2026-09-04", at: "20:00")])
+    outbox   = Outbox.new
+
+    WeeklyNotifier.new(showtimes: [listings], movies_db: MovieDatabase.new,
+                       messenger: outbox, cinemas: [LABORAL]).run(today: WEDNESDAY)
+    title_line = outbox.digest.raw.lines.find { |line| line.include?("Ciclo Buñuel") }.chomp
+
+    assert_equal "<b>Ciclo Buñuel: presentación</b>", title_line
+  end
+
   def test_a_rated_film_is_shown_with_its_score
     potter   = film("Harry Potter y la Piedra Filosofal", year: 2001)
     listings = Listings.new("Teatro de la Laboral (Laboral Cinemateca)" => [screening(potter, on: "2026-09-04", at: "17:00")])

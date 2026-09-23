@@ -59,3 +59,13 @@ Captured 2026-08-28 from `GET /3/search/movie`, one file per query.
 `search_el_ser_querido.json` is the Spanish production whose
 `original_language` is `es`; the others are English-language films with a
 Spanish release title.
+
+`movie_el_ser_querido.json` and `movie_la_constelacion_del_perro.json` are the
+film pages (`GET /3/movie/{id}`) behind two of those searches, which is where
+the country the digest flags comes from: `origin_country`, and
+`production_countries` as the fallback. **These two were written by hand, not
+captured** — they were added in a session with no TMDB key. The shape follows
+TMDB's documented response, pruned to the keys the notifier reads, and the
+countries are the films' real ones. Run the **Capture API fixtures** workflow
+with `provider=tmdb` to replace them with real captures: it now fetches each
+top match's page alongside the search and prints it as `tmdb/movie_….json`.

@@ -6,10 +6,10 @@ require "uri"
 module VoCinema
   module Movies
     # What TMDB knows about a film the cinemas listed in Spanish: its original
-    # title, its rating, whether it is a Spanish production, and where its page
-    # on TMDB is.
+    # title, its rating, whether it is a Spanish production, where its page on
+    # TMDB is, and which country it comes from.
     #
-    # Four pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
+    # Five pure queries — nothing here mutates a Film. WeeklyNotifier owns that.
     class Tmdb
       DOMAIN          = "https://api.themoviedb.org"
       SITE            = "https://www.themoviedb.org"
@@ -19,6 +19,7 @@ module VoCinema
         @api_key = api_key
         @http    = http
         @results = {}
+        @details = {}
       end
 
       def fetch_original_title(film)
@@ -35,6 +36,19 @@ module VoCinema
         id = top_match_for(film.localized_title, film.year)&.dig("id")
 
         id && "#{SITE}/movie/#{id}"
+      end
+
+      # The country the film is mainly from, as an ISO code ("US", "ES"). The
+      # search results carry none, so this is the one question that costs a
+      # second request: the film's own page, for the same top match the link
+      # leads to. TMDB's origin_country is its answer to exactly this question;
+      # production_countries is the fallback for an entry that leaves it empty.
+      def origin_country_for(film)
+        id = top_match_for(film.localized_title, film.year)&.dig("id")
+        return nil unless id
+
+        movie = details(id)
+        Array(movie["origin_country"]).first || Array(movie["production_countries"]).first&.dig("iso_3166_1")
       end
 
       def rating_for(film)
@@ -73,16 +87,24 @@ module VoCinema
         @results[[title, year]] ||= fetch(title, year)
       end
 
+      # Cached by id for the same reason as #search: a film showing at several
+      # cinemas is asked about once per cinema.
+      def details(id)
+        @details[id] ||= get_json("#{DOMAIN}/3/movie/#{id}?#{URI.encode_www_form(api_key: @api_key)}") || {}
+      end
+
       def fetch(title, year)
         query = URI.encode_www_form(query: title, language: "es-ES", api_key: @api_key)
         query += "&year=#{year}" if year
-        response = @http.get("#{DOMAIN}/3/search/movie?#{query}")
         # An empty list rather than nil: "TMDB had nothing for us" and "TMDB
         # would not answer" mean the same thing to every caller here, and a nil
         # would have each of them checking for it.
-        return [] unless response.code == "200"
+        get_json("#{DOMAIN}/3/search/movie?#{query}")&.dig("results") || []
+      end
 
-        JSON.parse(response.body)["results"] || []
+      def get_json(url)
+        response = @http.get(url)
+        response.code == "200" ? JSON.parse(response.body) : nil
       end
     end
   end
