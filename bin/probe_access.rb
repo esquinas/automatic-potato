@@ -59,9 +59,21 @@ def report(label, response)
   response.each_header { |name, value| puts "  #{name}: #{value}" if name.match?(TELLING_HEADERS) }
   body = response.body.to_s
   puts "body: #{body.bytesize} bytes"
-  puts body.byteslice(0, BODY_SAMPLE).to_s.scrub
+  puts cloudflare_verdict(body) || body.byteslice(0, BODY_SAMPLE).to_s.scrub
   puts "===== END #{label} ====="
   response
+end
+
+# A Cloudflare block page spends its first kilobytes on boilerplate; the reason
+# for the block and the Ray ID come after. This is the part worth reading: a
+# rule the site set for itself reads differently from anything upstream of it.
+def cloudflare_verdict(body)
+  return nil unless body[%r{<title>(.*?)</title>}im, 1].to_s.include?("Cloudflare")
+
+  details = body[/<div id="cf-error-details".*/m].to_s.gsub(/<script.*?<\/script>/m, "")
+  text    = details.gsub(/<[^>]+>/, " ").gsub(/&[a-z#0-9]+;/i, " ").squeeze(" \n").strip
+
+  "Cloudflare says:\n#{text.lines.map(&:strip).reject(&:empty?).join("\n")}"
 end
 
 def html_client(extra = {}) = VoCinema::Http::Client.new(headers: HTML_HEADERS.merge(extra))
