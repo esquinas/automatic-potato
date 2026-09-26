@@ -25,6 +25,7 @@
 
 require "bundler/setup"
 require "json"
+require "uri"
 require_relative "../lib/vo_cinema"
 
 YELMO     = VoCinema::Showtimes::Yelmo
@@ -64,6 +65,15 @@ def report(label, response)
 end
 
 def html_client(extra = {}) = VoCinema::Http::Client.new(headers: HTML_HEADERS.merge(extra))
+
+# A page as a browser would end up on it. Http::Client does not follow
+# redirects, and both SensaCine and the Ocine site have moved their pages.
+def browse(url, hops: 3)
+  response = html_client.get(url)
+  return response unless hops.positive? && response.code.start_with?("3") && response["location"]
+
+  browse(URI.join(url, response["location"]).to_s, hops: hops - 1)
+end
 
 # The cookies a page hands out, as a Cookie header would send them back.
 def cookies_from(response)
@@ -135,28 +145,32 @@ end
 # ---------------------------------------------------------------------------
 section "Los Fresnos 1/3 — does SensaCine still list #{FRESNOS.sensacine_id}?" do
   theatre << report("sensacine theatre #{FRESNOS.sensacine_id}",
-                   html_client.get("#{SENSACINE::DOMAIN}/cines/cine-#{FRESNOS.sensacine_id}/"))
+                   browse("#{SENSACINE::DOMAIN}/cines/cine/#{FRESNOS.sensacine_id}/"))
   title = theatre.first.body.to_s[%r{<title>(.*?)</title>}im, 1]
   puts "page title: #{title.to_s.strip.inspect}"
 end
 
 # ---------------------------------------------------------------------------
 section "Los Fresnos 2/3 — SensaCine's theatres near Gijón, in case the id moved" do
-  ocimax_page = html_client.get("#{SENSACINE::DOMAIN}/cines/cine-#{OCIMAX.sensacine_id}/")
+  ocimax_page = browse("#{SENSACINE::DOMAIN}/cines/cine/#{OCIMAX.sensacine_id}/")
   puts "Ocimax theatre page: HTTP #{ocimax_page.code}"
-  cities = (ocimax_page.body.to_s + theatre.first&.body.to_s).scan(%r{/cines/[a-z-]*ciudad-?\d+/?}i).uniq
-  puts "city pages linked: #{cities.inspect}"
+  links  = (ocimax_page.body.to_s + theatre.first&.body.to_s).scan(%r{href=["']((?:https://www\.sensacine\.com)?/cines/[^"'#?]+)}i)
+                                                                 .flatten.map { |link| link.sub(SENSACINE::DOMAIN, "") }.uniq
+  puts "/cines/ links on the theatre pages:"
+  links.first(40).each { |link| puts "  #{link}" }
+  cities = links.grep(/ciudad|ciudades|\d{4,}/i).grep_v(%r{/cine/})
+  puts "city pages to read: #{cities.inspect}"
   cities.first(2).each do |path|
-    city = html_client.get("#{SENSACINE::DOMAIN}#{path}")
+    city = browse("#{SENSACINE::DOMAIN}#{path}")
     puts "\n#{path}: HTTP #{city.code}"
-    city.body.to_s.scan(%r{href=["'][^"']*/cines/cine-([A-Z0-9]+)/?["'][^>]*>\s*([^<]{2,120})}i)
+    city.body.to_s.scan(%r{href=["'][^"']*/cines/cine/?-?([A-Z0-9]+)/?["'][^>]*>\s*([^<]{2,120})}i)
         .uniq.each { |id, name| puts "  #{id}  #{name.strip}" }
   end
 end
 
 # ---------------------------------------------------------------------------
 section "Los Fresnos 3/3 — the cinema's own site" do
-  fresnos_site = report("ocine los fresnos home", html_client.get(FRESNOS.url))
+  fresnos_site = report("ocine los fresnos home", browse(FRESNOS.url))
   endpoints_in("ocine los fresnos home", fresnos_site.body.to_s) if fresnos_site.code == "200"
 end
 
