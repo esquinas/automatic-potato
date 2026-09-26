@@ -687,7 +687,7 @@ without the matching rules, and the agreement row it prints is all zeroes. The
 merge and agreement tests cover the behaviour directly, but a refreshed capture
 that overlapped would make the end-to-end test carry it too.
 
-**What broke on 25 September — still open.** That Friday's digest listed three
+**What broke on 25 September — diagnosed, not yet fixed.** That Friday's digest listed three
 Spanish films at Ocimax and nothing at Los Fresnos, and missed every subtitled
 screening, among them *En el corazón de la bestia* at both venues. The job logs
 show two provider failures, and the run reported neither of them:
@@ -718,3 +718,26 @@ with the redesign, with the new page naming its replacement), whether a session
 cookie gets the request through, and whether SensaCine still lists Los Fresnos
 under this id or another. Read its log before choosing a fix; each explanation
 wants a different one.
+
+**What the probe found, 26 September** (runs 36264953552 and 36265236857):
+
+- **Yelmo: Cloudflare blocks the runner, across the whole domain.** Every URL,
+  including `/`, `/cartelera` and `/robots.txt`, returned the Cloudflare page
+  *"Attention Required! | Cloudflare"* (`server: cloudflare`, a `cf-ray`,
+  `server-timing: cfOrigin;dur=0`, so the request never reached Yelmo's
+  server). Sending the `__cf_bm` cookie back changed nothing. It is not the
+  endpoint retired with the redesign: nothing was reachable to tell either
+  way. No header change can fix a block on the network the request comes
+  from. What can: a request from somewhere Cloudflare does not block (a
+  self-hosted runner), or accepting SensaCine's word for Ocimax (see below).
+- **Los Fresnos: SensaCine still lists the venue under `E2907`, but has no
+  showtimes for it.** The theatre page (now at `/cines/cine/E2907/`; the old
+  `/cines/cine-E2907/` path answers 301) is live and titled *Ocine Premium Los
+  Fresnos*, but the showtimes endpoint says `no.showtime.error`. So the id did
+  not move; the cinema stopped feeding SensaCine. The cinema's own site
+  (now `https://ocinepremiumlosfresnos.es/`, without `www`) is a single-page
+  app built on Base44 (`base44_access_token`, `media.base44.com`, one bundle
+  `/assets/index-*.js`). Its programme will come from Base44's entities API,
+  and the next probe should read that bundle to find which entity and URL.
+- **Control:** SensaCine's showtimes for `E0628` answered 200 with results
+  from the same runner, so the runner itself was fine.
