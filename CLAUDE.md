@@ -80,6 +80,7 @@ bin/
   diagnose.rb           # token health check + live SensaCine probe
   capture_fixtures.rb   # prints live provider payloads for refreshing fixtures
   probe_identity.rb     # asks how the providers name the same film
+  probe_access.rb       # asks why a provider stopped answering, from the runner's network
 config/cinemas.yml      # user-editable: the cinemas' timezone, then the list itself
 .mise.toml              # Ruby version (3.3) pinned for mise
 test.rb                 # entry point: loads test/support/ then every test/**/*_test.rb
@@ -685,3 +686,35 @@ screening both providers describe: the digest is byte-identical with and
 without the matching rules, and the agreement row it prints is all zeroes. The
 merge and agreement tests cover the behaviour directly, but a refreshed capture
 that overlapped would make the end-to-end test carry it too.
+
+**What broke on 25 September — still open.** That Friday's digest listed three
+Spanish films at Ocimax and nothing at Los Fresnos, and missed every subtitled
+screening, among them *En el corazón de la bestia* at both venues. The job logs
+show two provider failures, and the run reported neither of them:
+
+| Run | Yelmo `GetNowPlaying` | Agreement block | SensaCine `E2907` (Los Fresnos) |
+|---|---|---|---|
+| 18 Sep (35358442443) | 200 | `254,19,Yelmo,…` | `no.showtime.error`, all 7 days |
+| 23 Sep (35918075259) | **403**, and again on the retry | absent | same |
+| 25 Sep (36156155844) | **403**, and again on the retry | absent | same |
+
+- **Yelmo refuses the runner.** With Yelmo gone, Ocimax is SensaCine's word
+  alone, and SensaCine files Yelmo's subtitled prints under `dubbed`. Every
+  screening therefore read as dubbed, and only `spanish_original?` kept
+  anything. The missing agreement block is the tell: it goes silent when a
+  venue has one voice.
+- **SensaCine stopped programming `E2907`.** It returned screenings on 1
+  September and has answered `no.showtime.error` with an empty `nextDate`
+  since at least the 18th. That is the case *An empty day means expired, not
+  absent* calls worth alarming on, and no other provider covers the venue.
+- **Latent:** the Ocimax site labels the film "Sub esp". `VO_LANGUAGES` would
+  miss a `Language` field that says only that, even once Yelmo answers again.
+  Check the vocabulary against the first new payload.
+
+`bin/probe_access.rb` (the **Capture API fixtures** workflow, `provider=access`)
+asks what separates the explanations: whether the whole Yelmo domain refuses
+the runner (a shield, visible in the headers) or only the endpoint does (retired
+with the redesign, with the new page naming its replacement), whether a session
+cookie gets the request through, and whether SensaCine still lists Los Fresnos
+under this id or another. Read its log before choosing a fix; each explanation
+wants a different one.
