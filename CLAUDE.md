@@ -730,6 +730,15 @@ wants a different one.
   way. No header change can fix a block on the network the request comes
   from. What can: a request from somewhere Cloudflare does not block (a
   self-hosted runner), or accepting SensaCine's word for Ocimax (see below).
+- **Not the LaLiga blocking.** Run 36268542122 printed the block page in full:
+  *"Sorry, you have been blocked… This website is using a security service to
+  protect itself from online attacks"*, naming the runner's IP. It is a
+  firewall rule on Yelmo's own site, applied at Cloudflare's edge. The
+  court-ordered football blocking works differently: Spanish ISPs drop
+  connections to Cloudflare ranges, so it fails before Cloudflare answers, and
+  only on a Spanish ISP. This runner is in the US and was served from
+  `MSP`/`ORD`, while SensaCine and the Ocine site (also behind Cloudflare)
+  answered 200 in the same run. The Yelmo refusals also include a Wednesday.
 - **Los Fresnos: SensaCine still lists the venue under `E2907`, but has no
   showtimes for it.** The theatre page (now at `/cines/cine/E2907/`; the old
   `/cines/cine-E2907/` path answers 301) is live and titled *Ocine Premium Los
