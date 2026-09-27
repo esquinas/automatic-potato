@@ -10,6 +10,10 @@ name: Capture API fixtures
 # The "identity" option runs a different script: bin/probe_identity.rb, which
 # asks whether TMDB recognises the same film through the different names the
 # providers give it. See the comment at the top of that file.
+#
+# The "access" option runs bin/probe_access.rb: why a provider stopped
+# answering (a shield, a retired endpoint, a missing session, a venue gone from
+# SensaCine), asked from the runner's own network. It needs no secrets.
 
 on:
   workflow_dispatch:
@@ -18,7 +22,7 @@ on:
         description: "Which provider to capture (identity runs the film-identity probe)"
         type: choice
         default: all
-        options: [all, sensacine, yelmo, tmdb, identity]
+        options: [all, sensacine, yelmo, tmdb, identity, access]
 
 jobs:
   capture:
@@ -32,7 +36,7 @@ jobs:
           bundler-cache: true
 
       - name: Print live API payloads
-        if: inputs.provider != 'identity'
+        if: inputs.provider != 'identity' && inputs.provider != 'access'
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           PROVIDER: ${{ inputs.provider }}
@@ -43,3 +47,7 @@ jobs:
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: ruby bin/probe_identity.rb
+
+      - name: Probe why a provider stopped answering
+        if: inputs.provider == 'access'
+        run: ruby bin/probe_access.rb

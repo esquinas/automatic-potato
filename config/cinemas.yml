@@ -13,7 +13,7 @@ cinemas:
 
   - name: "Ocine Premium Los Fresnos"
     sensacine_id: "E2907"
-    url: "https://www.ocinepremiumlosfresnos.es/"
+    url: "https://ocinepremiumlosfresnos.es/"
     check_vo: true
 
   - name: "Centro Municipal Integrado Ateneo de La Calzada"
