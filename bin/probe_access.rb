@@ -17,6 +17,9 @@
 #   Los Fresnos — does SensaCine still list the venue, under this id or another,
 #   and what does the cinema's own site fetch its programme from?
 #
+#   lacartelera.com — a candidate third provider for both venues: does it
+#   answer this runner, and are its sessions in the page or behind an API?
+#
 # A known-good SensaCine request runs last as the control: if that fails too,
 # the runner is the problem and nothing above it means anything.
 #
@@ -184,6 +187,63 @@ end
 section "Los Fresnos 3/3 — the cinema's own site" do
   fresnos_site = report("ocine los fresnos home", browse(FRESNOS.url))
   endpoints_in("ocine los fresnos home", fresnos_site.body.to_s) if fresnos_site.code == "200"
+end
+
+# ---------------------------------------------------------------------------
+# lacartelera.com, a candidate third provider: whether this runner may read it
+# at all, and if so where its sessions live and how it labels a print's version.
+
+LACARTELERA        = "https://www.lacartelera.com"
+LACARTELERA_OCIMAX = "#{LACARTELERA}/es/cine/ocimax-gijon-asturias/".freeze
+VERSION_LABELS     = { "VOSE" => /VOSE/, "V.O." => /V\.O\./, "VO" => /\bVO\b/, "Subtitulad" => /subtitulad/i,
+                       "Doblad" => /doblad/i, "Castellano" => /castellano/i, "Español" => /espa[ñn]ol/i }.freeze
+
+def text_of(html) = html.gsub(%r{<(script|style)\b.*?</\1>}im, " ").gsub(/<[^>]+>/, " ").gsub(/&[a-z#0-9]+;/i, " ").squeeze(" \n")
+
+# What a page says about its sessions, without knowing its markup yet.
+def sessions_in(label, html)
+  puts "\n===== BEGIN #{label}: sessions ====="
+  text = text_of(html)
+  VERSION_LABELS.each do |name, pattern|
+    hits = text.to_enum(:scan, pattern).map { Regexp.last_match.begin(0) }
+    puts "label #{name}: #{hits.size}"
+    hits.first(3).each { |at| puts "    …#{text[[at - 60, 0].max, 140].strip}…" }
+  end
+  times = text.scan(/\b(?:[01]\d|2[0-3])[:.][0-5]\d\b/)
+  puts "clock times in the text: #{times.size}, e.g. #{times.uniq.first(12).inspect}"
+  html.scan(%r{<script[^>]+application/ld\+json[^>]*>(.*?)</script>}im).flatten.each_with_index do |json, index|
+    puts "ld+json #{index}: #{json.strip.byteslice(0, BODY_SAMPLE).scrub}"
+  end
+  puts "data-* attribute names: #{html.scan(/\sdata-([a-z0-9_-]+)=/i).flatten.tally.sort_by { -_2 }.first(25).inspect}"
+  puts "===== END #{label}: sessions ====="
+end
+
+def links_in(html, pattern) = html.scan(/href=["']([^"'#]+)["']/i).flatten.grep(pattern).map { |link| URI.join(LACARTELERA, link).to_s }.uniq
+
+lacartelera = []
+
+section "lacartelera 1/2 — the Ocimax page, from the runner" do
+  page = report("lacartelera ocimax", browse(LACARTELERA_OCIMAX))
+  lacartelera << page
+  next unless page.code == "200"
+
+  html = page.body.to_s
+  endpoints_in("lacartelera ocimax", html)
+  sessions_in("lacartelera ocimax", html)
+  puts "\n/es/cine/ links:"
+  links_in(html, %r{/es/cine/}).first(40).each { |link| puts "  #{link}" }
+  puts "links that look like other days:"
+  links_in(html, /fecha|dia=|date|\d{4}-\d{2}-\d{2}|manana|ma%C3%B1ana/i).first(20).each { |link| puts "  #{link}" }
+end
+
+section "lacartelera 2/2 — Los Fresnos" do
+  fresnos = links_in(lacartelera.first&.body.to_s, /fresnos/i).first
+  if fresnos
+    page = report("lacartelera los fresnos", browse(fresnos))
+    sessions_in("lacartelera los fresnos", page.body.to_s) if page.code == "200"
+  else
+    puts "The Ocimax page links no Los Fresnos page."
+  end
 end
 
 # ---------------------------------------------------------------------------
