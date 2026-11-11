@@ -13,7 +13,8 @@ name: Capture API fixtures
 #
 # The "access" option runs bin/probe_access.rb: why a provider stopped
 # answering (a shield, a retired endpoint, a missing session, a venue gone from
-# SensaCine), asked from the runner's own network. It needs no secrets.
+# SensaCine), and whether lacartelera.com answers, asked from the runner's own
+# network. It needs no secrets.
 
 on:
   workflow_dispatch:

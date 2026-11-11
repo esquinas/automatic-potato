@@ -17,6 +17,12 @@
 #   Los Fresnos — does SensaCine still list the venue, under this id or another,
 #   and what does the cinema's own site fetch its programme from?
 #
+#   cineyelmo.com — where yelmocines.es now redirects: does the new site answer
+#   this runner, and what does it fetch its programme from?
+#
+#   lacartelera.com — a candidate third provider for both venues: does it
+#   answer this runner, and are its sessions in the page or behind an API?
+#
 # A known-good SensaCine request runs last as the control: if that fails too,
 # the runner is the problem and nothing above it means anything.
 #
@@ -52,6 +58,9 @@ def section(title)
 rescue StandardError => e
   puts "  #{e.class}: #{e.message}"
 end
+
+# Http::Client hands bodies back as binary; a UTF-8 pattern cannot match one.
+def utf8(body) = body.to_s.dup.force_encoding(Encoding::UTF_8).scrub
 
 def report(label, response)
   puts "\n===== BEGIN #{label} ====="
@@ -95,6 +104,7 @@ end
 # Where a page says its data comes from: scripts it loads, URL-looking strings
 # that smell of an endpoint, and any inline JSON blob a modern front end ships.
 def endpoints_in(label, html)
+  html = utf8(html)
   puts "\n===== BEGIN #{label}: what the page fetches ====="
   scripts = html.scan(/<script[^>]+src=["']([^"']+)["']/i).flatten.uniq
   puts "scripts (#{scripts.size}):"
@@ -184,6 +194,150 @@ end
 section "Los Fresnos 3/3 — the cinema's own site" do
   fresnos_site = report("ocine los fresnos home", browse(FRESNOS.url))
   endpoints_in("ocine los fresnos home", fresnos_site.body.to_s) if fresnos_site.code == "200"
+end
+
+# ---------------------------------------------------------------------------
+# lacartelera.com, a candidate third provider: whether this runner may read it
+# at all, and if so where its sessions live and how it labels a print's version.
+
+LACARTELERA        = "https://www.lacartelera.com"
+LACARTELERA_OCIMAX = "#{LACARTELERA}/es/cine/ocimax-gijon-asturias/".freeze
+VERSION_LABELS     = { "VOSE" => /VOSE/, "V.O." => /V\.O\./, "VO" => /\bVO\b/, "Subtitulad" => /subtitulad/i,
+                       "Doblad" => /doblad/i, "Castellano" => /castellano/i, "Español" => /espa[ñn]ol/i }.freeze
+
+def text_of(html) = utf8(html).gsub(%r{<(script|style)\b.*?</\1>}im, " ").gsub(/<[^>]+>/, " ").gsub(/&[a-z#0-9]+;/i, " ").squeeze(" \n")
+
+# What a page says about its sessions, without knowing its markup yet.
+def sessions_in(label, html)
+  puts "\n===== BEGIN #{label}: sessions ====="
+  html = utf8(html)
+  text = text_of(html)
+  VERSION_LABELS.each do |name, pattern|
+    hits = text.to_enum(:scan, pattern).map { Regexp.last_match.begin(0) }
+    puts "label #{name}: #{hits.size}"
+    hits.first(3).each { |at| puts "    …#{text[[at - 60, 0].max, 140].strip}…" }
+  end
+  times = text.scan(/\b(?:[01]\d|2[0-3])[:.][0-5]\d\b/)
+  puts "clock times in the text: #{times.size}, e.g. #{times.uniq.first(12).inspect}"
+  html.scan(%r{<script[^>]+application/ld\+json[^>]*>(.*?)</script>}im).flatten.each_with_index do |json, index|
+    puts "ld+json #{index}: #{json.strip.byteslice(0, BODY_SAMPLE).scrub}"
+  end
+  puts "data-* attribute names: #{html.scan(/\sdata-([a-z0-9_-]+)=/i).flatten.tally.sort_by { -_2 }.first(25).inspect}"
+  puts "===== END #{label}: sessions ====="
+end
+
+def links_in(html, pattern, base: LACARTELERA)
+  utf8(html).scan(/href=["']([^"'#]+)["']/i).flatten.grep(pattern).map { |link| URI.join(base, link).to_s rescue link }.uniq
+end
+
+# ---------------------------------------------------------------------------
+# cineyelmo.com: on 11 November every www.yelmocines.es URL answered 301 to
+# https://cineyelmo.com/es, from an AWS load balancer rather than Cloudflare.
+# Yelmo has moved. Does the new site answer this runner, and where does it get
+# its programme from?
+
+CINEYELMO     = "https://cineyelmo.com"
+OCIMAX_LINK   = /ocimax|gij[oó]n|asturias/i
+SITE_LINK     = /cine|cartelera|pelicul|horario|sesion|session|showtime|movie|film/i
+# Strings in a script bundle that look like an API it calls.
+BUNDLE_STRING = %r{["'`]((?:https?://[^"'`\s]{4,200})|(?:/[\w\-./${}]*(?:api|graphql|showtime|session|sesion|cartelera|cinema|cine|movie|pelicula|schedule|horario)[\w\-./${}?=&]*))["'`]}i
+
+cineyelmo = {}
+
+def same_site_scripts(html, base) = utf8(html).scan(/<script[^>]+src=["']([^"']+)["']/i).flatten
+                                               .map { |src| URI.join(base, src).to_s rescue nil }.compact
+                                               .select { |src| src.include?("cineyelmo") }.uniq
+
+section "cineyelmo 1/4 — the new home page, from the runner" do
+  home = report("cineyelmo home", browse("#{CINEYELMO}/es"))
+  cineyelmo[:home] = home
+  next unless home.code == "200"
+
+  endpoints_in("cineyelmo home", home.body)
+  puts "\nlinks that name Ocimax, Gijón or Asturias:"
+  links_in(home.body, OCIMAX_LINK, base: CINEYELMO).first(30).each { |link| puts "  #{link}" }
+  puts "links that look like programme pages:"
+  links_in(home.body, SITE_LINK, base: CINEYELMO).first(40).each { |link| puts "  #{link}" }
+end
+
+section "cineyelmo 2/4 — robots.txt and the sitemap, for the URL patterns" do
+  robots = report("cineyelmo robots", browse("#{CINEYELMO}/robots.txt"))
+  sitemaps = utf8(robots.body).scan(/^sitemap:\s*(\S+)/i).flatten
+  sitemaps = ["#{CINEYELMO}/sitemap.xml"] if sitemaps.empty?
+  sitemaps.first(2).each do |url|
+    sitemap = browse(url)
+    locs = utf8(sitemap.body).scan(%r{<loc>\s*([^<]+?)\s*</loc>}i).flatten
+    puts "\n#{url}: HTTP #{sitemap.code}, #{locs.size} <loc> entries"
+    puts "  of which name Ocimax/Gijón/Asturias:"
+    locs.grep(OCIMAX_LINK).first(20).each { |loc| puts "    #{loc}" }
+    puts "  a sample of the rest:"
+    locs.grep_v(OCIMAX_LINK).first(25).each { |loc| puts "    #{loc}" }
+  end
+end
+
+section "cineyelmo 3/4 — the Ocimax page" do
+  found   = links_in(cineyelmo[:home]&.body.to_s, OCIMAX_LINK, base: CINEYELMO)
+  guesses = %w[/es/cines/ocimax-gijon /es/cine/ocimax-gijon /es/cartelera/asturias/ocimax-gijon
+               /es/cines/asturias/ocimax-gijon].map { |path| "#{CINEYELMO}#{path}" }
+  (found.first(3) + guesses).uniq.each do |url|
+    page = report("cineyelmo #{URI(url).path}", browse(url))
+    next unless page.code == "200"
+
+    cineyelmo[:ocimax] ||= page
+    endpoints_in("cineyelmo #{URI(url).path}", page.body)
+    sessions_in("cineyelmo #{URI(url).path}", page.body)
+    break
+  end
+  puts "\nNo Ocimax page answered 200." unless cineyelmo[:ocimax]
+end
+
+section "cineyelmo 4/4 — what the script bundles call, and the old endpoint on the new domain" do
+  pages   = [cineyelmo[:home], cineyelmo[:ocimax]].compact.select { |page| page.code == "200" }
+  scripts = pages.flat_map { |page| same_site_scripts(page.body, CINEYELMO) }.uniq
+  puts "same-site scripts (#{scripts.size}):"
+  scripts.each { |src| puts "  #{src}" }
+  scripts.first(6).each do |src|
+    bundle  = html_client.get(src)
+    strings = utf8(bundle.body).scan(BUNDLE_STRING).flatten.uniq
+    puts "\n===== BEGIN cineyelmo bundle #{URI(src).path}: HTTP #{bundle.code}, #{bundle.body.to_s.bytesize} bytes ====="
+    strings.first(80).each { |string| puts "  #{string}" }
+    puts "===== END cineyelmo bundle #{URI(src).path} ====="
+  end
+
+  headers = YELMO::HEADERS.merge("Referer" => "#{CINEYELMO}/es", "Origin" => CINEYELMO)
+  report("cineyelmo GetNowPlaying",
+         VoCinema::Http::Client.new(headers: headers)
+                               .post("#{CINEYELMO}/now-playing.aspx/GetNowPlaying",
+                                     JSON.generate({ cityKey: OCIMAX.yelmo_id.split("/").first })))
+end
+
+lacartelera = []
+
+section "lacartelera 1/2 — the Ocimax page, from the runner" do
+  page = report("lacartelera ocimax", browse(LACARTELERA_OCIMAX))
+  lacartelera << page
+  next unless page.code == "200"
+
+  html = utf8(page.body)
+  puts "\n===== BEGIN lacartelera ocimax: whole page, styles dropped ====="
+  puts html.gsub(%r{<style\b.*?</style>}im, "<style>…</style>")
+  puts "===== END lacartelera ocimax: whole page, styles dropped ====="
+  endpoints_in("lacartelera ocimax", html)
+  sessions_in("lacartelera ocimax", html)
+  puts "\n/es/cine/ links:"
+  links_in(html, %r{/es/cine/}).first(40).each { |link| puts "  #{link}" }
+  puts "links that look like other days:"
+  links_in(html, /fecha|dia=|date|\d{4}-\d{2}-\d{2}|manana|ma%C3%B1ana/i).first(20).each { |link| puts "  #{link}" }
+end
+
+section "lacartelera 2/2 — Los Fresnos" do
+  fresnos = links_in(lacartelera.first&.body.to_s, /fresnos/i).first
+  if fresnos
+    page = report("lacartelera los fresnos", browse(fresnos))
+    sessions_in("lacartelera los fresnos", page.body.to_s) if page.code == "200"
+  else
+    puts "The Ocimax page links no Los Fresnos page."
+  end
 end
 
 # ---------------------------------------------------------------------------
